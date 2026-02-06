@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FiArrowRight, FiStar, FiTruck, FiRefreshCw, FiShield, FiShoppingBag, FiTrendingUp, FiInstagram } from 'react-icons/fi';
+import { FiArrowRight, FiStar, FiTruck, FiRefreshCw, FiShield, FiShoppingBag, FiTrendingUp, FiInstagram, FiChevronDown } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/product/ProductCard';
 import { sampleProducts } from '@/data/products';
@@ -154,6 +154,19 @@ export default function HomePage() {
             </motion.div>
           </div>
         </div>
+
+        {/* Scroll Indicator */}
+        <motion.div
+          className="absolute bottom-16 left-1/2 -translate-x-1/2 cursor-pointer"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, y: [0, 8, 0] }}
+          transition={{ delay: 1, duration: 1.5, repeat: Infinity }}
+          onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+        >
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
+            <FiChevronDown size={24} className="text-black" />
+          </div>
+        </motion.div>
 
         {/* Slide Indicators */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3">
