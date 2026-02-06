@@ -151,22 +151,22 @@ export default function HomePage() {
                   <FiArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
+
+              {/* Scroll Indicator */}
+              <motion.div
+                className="mt-8 cursor-pointer"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, y: [0, 8, 0] }}
+                transition={{ delay: 0.8, duration: 1.5, repeat: Infinity }}
+                onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+              >
+                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mx-auto">
+                  <FiChevronDown size={24} className="text-black" />
+                </div>
+              </motion.div>
             </motion.div>
           </div>
         </div>
-
-        {/* Scroll Indicator */}
-        <motion.div
-          className="absolute bottom-16 left-1/2 -translate-x-1/2 cursor-pointer"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1, y: [0, 8, 0] }}
-          transition={{ delay: 1, duration: 1.5, repeat: Infinity }}
-          onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
-        >
-          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
-            <FiChevronDown size={24} className="text-black" />
-          </div>
-        </motion.div>
 
         {/* Slide Indicators */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3">
