@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { FiArrowRight, FiStar, FiTruck, FiRefreshCw, FiShield, FiShoppingBag, FiTrendingUp, FiInstagram } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/product/ProductCard';
+import { sampleProducts } from '@/data/products';
 import { Product } from '@/types';
 
 // Hero Slides Data - Modern Dress Images (No People)
@@ -50,73 +51,8 @@ const features = [
   { icon: FiShoppingBag, title: 'Quality Guarantee', desc: 'Premium materials' },
 ];
 
-// Sample Products (In real app, fetch from Supabase)
-const sampleProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Premium Cotton T-Shirt',
-    slug: 'premium-cotton-tshirt',
-    description: 'High-quality organic cotton t-shirt',
-    price: 49.99,
-    original_price: 79.99,
-    images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600'],
-    category_id: '1',
-    sizes: ['S', 'M', 'L', 'XL'],
-    colors: ['White', 'Black', 'Navy'],
-    stock: 100,
-    is_featured: true,
-    is_new: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Designer Denim Jacket',
-    slug: 'designer-denim-jacket',
-    description: 'Classic denim jacket with modern styling',
-    price: 149.99,
-    original_price: 199.99,
-    images: ['https://images.unsplash.com/photo-1523205565295-f8e91625443c?w=600'],
-    category_id: '2',
-    sizes: ['S', 'M', 'L', 'XL'],
-    colors: ['Blue', 'Black'],
-    stock: 50,
-    is_featured: true,
-    is_new: false,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    name: 'Elegant Silk Dress',
-    slug: 'elegant-silk-dress',
-    description: 'Luxurious silk dress for evening occasions',
-    price: 299.99,
-    original_price: 399.99,
-    images: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=600'],
-    category_id: '3',
-    sizes: ['XS', 'S', 'M', 'L'],
-    colors: ['Red', 'Black', 'Champagne'],
-    stock: 30,
-    is_featured: true,
-    is_new: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    name: 'Minimalist Watch',
-    slug: 'minimalist-watch',
-    description: 'Sleek minimalist watch with leather strap',
-    price: 199.99,
-    original_price: 249.99,
-    images: ['https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=600'],
-    category_id: '4',
-    sizes: ['One Size'],
-    colors: ['Silver', 'Gold'],
-    stock: 75,
-    is_featured: true,
-    is_new: false,
-    created_at: new Date().toISOString(),
-  },
-];
+// Get featured products for homepage
+const featuredProducts = sampleProducts.filter(p => p.is_featured).slice(0, 4);
 
 // Animated Headlines
 const headlines = [
@@ -327,7 +263,7 @@ export default function HomePage() {
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {sampleProducts.map((product, idx) => (
+            {featuredProducts.map((product, idx) => (
               <ProductCard key={product.id} product={product} index={idx} />
             ))}
           </div>
