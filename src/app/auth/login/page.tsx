@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FcGoogle } from 'react-icons/fc';
 import Button from '@/components/ui/Button';
 import { useAuthStore } from '@/store';
 import toast from 'react-hot-toast';
@@ -12,62 +12,58 @@ import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser, setLoading } = useAuthStore();
+  const { setUser, setLoading: setStoreLoading } = useAuthStore();
   
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLocalLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!email || !password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-    
+  // Google Sign In
+  const handleGoogleSignIn = async () => {
     setLocalLoading(true);
+    setStoreLoading(true);
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
       });
-      
+
       if (error) {
         toast.error(error.message);
-        return;
+        setStoreLoading(false);
       }
-      
-      setUser({
-        id: data.user?.id || '',
-        email: data.user?.email || '',
-        name: data.user?.user_metadata?.name || email.split('@')[0],
-        is_admin: false,
-        created_at: new Date().toISOString(),
-      });
-      toast.success('Welcome back!');
-      router.push('/');
+      // Redirect will happen automatically by Supabase
     } catch (error) {
-      toast.error('An error occurred');
-    } finally {
+      toast.error('An error occurred with Google sign in');
+      setStoreLoading(false);
       setLocalLoading(false);
     }
   };
 
   // Demo login
   const handleDemoLogin = () => {
-    setUser({
-      id: 'demo-user',
-      email: 'demo@cult.com',
-      name: 'Demo User',
-      is_admin: false,
-      created_at: new Date().toISOString(),
-    });
-    toast.success('Welcome to Demo Mode!');
-    router.push('/');
+    setLocalLoading(true);
+    setStoreLoading(true);
+    
+    setTimeout(() => {
+      setUser({
+        id: 'demo-user',
+        email: 'demo@cult.com',
+        name: 'Demo User',
+        avatar_url: null,
+        is_admin: false,
+        created_at: new Date().toISOString(),
+      });
+      toast.success('Welcome to Demo Mode!');
+      setLocalLoading(false);
+      setStoreLoading(false);
+      router.push('/');
+    }, 500);
   };
 
   return (
@@ -97,6 +93,7 @@ export default function LoginPage() {
             variant="outline"
             className="w-full mb-6"
             onClick={handleDemoLogin}
+            disabled={loading}
           >
             Continue as Demo User
           </Button>
@@ -108,78 +105,23 @@ export default function LoginPage() {
             <div className="flex-1 border-t border-gray-200" />
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
-                />
-              </div>
-            </div>
+          {/* Google Sign In */}
+          <Button
+            variant="outline"
+            className="w-full mb-4 flex items-center justify-center gap-3"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+          >
+            <FcGoogle size={22} />
+            Continue with Google
+          </Button>
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
-                />
-                <span className="text-sm text-gray-600">Remember me</span>
-              </label>
-              <Link
-                href="/auth/forgot-password"
-                className="text-sm text-orange-500 hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              disabled={loading}
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </form>
+          {/* Info Box */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <p className="text-sm text-gray-600 text-center">
+              We only support <span className="font-semibold">Google Sign-In</span> for secure and easy access to your account.
+            </p>
+          </div>
 
           {/* Register Link */}
           <p className="text-center text-gray-600 mt-6">

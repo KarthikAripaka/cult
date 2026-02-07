@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FiArrowRight, FiStar, FiTruck, FiRefreshCw, FiShield, FiShoppingBag, FiTrendingUp, FiInstagram, FiChevronDown } from 'react-icons/fi';
+import { FiArrowRight, FiTruck, FiRefreshCw, FiShield, FiShoppingBag, FiTrendingUp, FiInstagram, FiChevronDown, FiLoader } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/product/ProductCard';
 import { Product, Category } from '@/types';
 
-// Hero Slides Data - Modern Dress Images (No People)
+// Hero Slides Data
 const heroSlides = [
   {
     image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1920&q=80',
@@ -34,15 +34,6 @@ const heroSlides = [
   },
 ];
 
-// Categories Data
-const defaultCategories = [
-  { id: '1', name: 'New Arrivals', image_url: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&q=80', slug: 'new-arrivals', created_at: '' },
-  { id: '2', name: 'Men', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&q=80', slug: 'men', created_at: '' },
-  { id: '3', name: 'Women', image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=80', slug: 'women', created_at: '' },
-  { id: '4', name: 'Accessories', image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80', slug: 'accessories', created_at: '' },
-  { id: '5', name: 'Sale', image_url: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=600&q=80', slug: 'sale', created_at: '' },
-];
-
 // Features Data
 const features = [
   { icon: FiTruck, title: 'Free Shipping', desc: 'On orders above ₹2000' },
@@ -63,15 +54,17 @@ export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentHeadline, setCurrentHeadline] = useState(0);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>(defaultCategories as Category[]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch featured products and categories
+  // Fetch featured products and categories from Supabase
   useEffect(() => {
     const fetchData = async () => {
       try {
         // Fetch featured products
         const productsResponse = await fetch('/api/products?is_featured=true&limit=4');
+        if (!productsResponse.ok) throw new Error('Failed to fetch products');
         const productsData = await productsResponse.json();
         if (productsData.products) {
           setFeaturedProducts(productsData.products);
@@ -79,12 +72,14 @@ export default function HomePage() {
 
         // Fetch categories
         const categoriesResponse = await fetch('/api/categories');
+        if (!categoriesResponse.ok) throw new Error('Failed to fetch categories');
         const categoriesData = await categoriesResponse.json();
         if (categoriesData.categories) {
           setCategories(categoriesData.categories.slice(0, 4));
         }
-      } catch (error) {
-        console.error('Error fetching data:', error);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -108,6 +103,17 @@ export default function HomePage() {
     }, 3000);
     return () => clearInterval(headlineInterval);
   }, []);
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -247,34 +253,48 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {categories.map((category, idx) => (
-              <motion.div
-                key={category.slug}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                whileHover={{ y: -5 }}
-              >
-                <Link href="/shop" className="group block">
-                  <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
-                    <Image
-                      src={category.image_url}
-                      alt={category.name}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <h3 className="text-white text-xl md:text-2xl font-bold tracking-wide">
-                        {category.name}
-                      </h3>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <FiLoader className="animate-spin text-3xl text-orange-500" />
+            </div>
+          ) : categories.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {categories.map((category, idx) => (
+                <motion.div
+                  key={category.slug}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  whileHover={{ y: -5 }}
+                >
+                  <Link href={`/shop?category=${category.slug}`} className="group block">
+                    <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
+                      {category.image_url ? (
+                        <Image
+                          src={category.image_url}
+                          alt={category.name}
+                          fill
+                          className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                          <span className="text-gray-400">{category.name}</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <h3 className="text-white text-xl md:text-2xl font-bold tracking-wide">
+                          {category.name}
+                        </h3>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500 py-12">No categories available</p>
+          )}
         </div>
       </section>
 
@@ -302,11 +322,19 @@ export default function HomePage() {
             </Link>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product, idx) => (
-              <ProductCard key={product.id} product={product} index={idx} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <FiLoader className="animate-spin text-3xl text-orange-500" />
+            </div>
+          ) : featuredProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featuredProducts.map((product, idx) => (
+                <ProductCard key={product.id} product={product} index={idx} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500 py-12">No products available</p>
+          )}
         </div>
       </section>
 

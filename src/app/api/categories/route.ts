@@ -1,34 +1,19 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { handleAPIError } from '@/lib/api-error';
-
-const mockCategories = [
-  { id: '1', name: 'New Arrivals', slug: 'new-arrivals', image_url: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&q=80', created_at: '' },
-  { id: '2', name: 'Men', slug: 'men', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&q=80', created_at: '' },
-  { id: '3', name: 'Women', slug: 'women', image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=80', created_at: '' },
-  { id: '4', name: 'Accessories', slug: 'accessories', image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80', created_at: '' },
-  { id: '5', name: 'Sale', slug: 'sale', image_url: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=600&q=80', created_at: '' },
-];
 
 export async function GET() {
-  const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && 
-                                process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://your-project.supabase.co';
-  
-  if (!isSupabaseConfigured) {
-    return NextResponse.json({ categories: mockCategories });
-  }
-  
   try {
     const { data: categories, error } = await supabase
       .from('categories')
       .select('*')
-      .order('created_at', { ascending: true });
-    
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+      
     if (error) throw error;
     
-    return NextResponse.json({ categories: categories || mockCategories });
+    return NextResponse.json({ categories: categories || [] });
   } catch (error) {
-    const { error: errorMessage } = handleAPIError(error);
-    return NextResponse.json({ categories: mockCategories });
+    console.error('Categories fetch error:', error);
+    return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });
   }
 }

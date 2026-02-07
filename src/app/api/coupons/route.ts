@@ -1,43 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { handleAPIError, createError } from '@/lib/api-error';
-
-const mockCoupons = [
-  { code: 'WELCOME10', discount: 10, discount_type: 'percentage', min_order: 0, max_discount: 100, is_active: true },
-  { code: 'FLAT500', discount: 500, discount_type: 'fixed', min_order: 2000, max_discount: null, is_active: true },
-  { code: 'SUMMER20', discount: 20, discount_type: 'percentage', min_order: 500, max_discount: 500, is_active: true },
-];
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   
-  const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && 
-                                process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://your-project.supabase.co';
-  
-  if (!isSupabaseConfigured) {
-    if (code) {
-      const coupon = mockCoupons.find(c => c.code.toLowerCase() === code.toLowerCase() && c.is_active);
-      if (!coupon) throw createError.notFound('Invalid coupon code');
-      return NextResponse.json({ coupon });
-    }
-    return NextResponse.json({ coupons: mockCoupons.filter(c => c.is_active) });
-  }
-  
   try {
     if (code) {
       const { data: coupon, error } = await supabase
-        .from('coupons').select('*').eq('code', code.toUpperCase()).eq('is_active', true).single();
-      if (error || !coupon) throw createError.notFound('Invalid coupon code');
+        .from('coupons')
+        .select('*')
+        .eq('code', code.toUpperCase())
+        .eq('is_active', true)
+        .gte('valid_until', new Date().toISOString())
+        .single();
+      
+      if (error || !coupon) {
+        return NextResponse.json({ error: 'Invalid or expired coupon code' }, { status: 404 });
+      }
+      
       return NextResponse.json({ coupon });
     }
     
-    const { data: coupons, error } = await supabase.from('coupons').select('*').eq('is_active', true);
+    const { data: coupons, error } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('is_active', true)
+      .gte('valid_until', new Date().toISOString())
+      .order('created_at', { ascending: false });
+    
     if (error) throw error;
-    return NextResponse.json({ coupons: coupons || mockCoupons });
+    
+    return NextResponse.json({ coupons: coupons || [] });
   } catch (error) {
-    const { error: errorMessage } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage }, { status: 400 });
+    console.error('Coupons fetch error:', error);
+    return NextResponse.json({ error: 'Failed to fetch coupons' }, { status: 500 });
   }
 }
 
@@ -46,33 +43,51 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { code, orderTotal } = body;
     
-    if (!code) throw createError.badRequest('Coupon code is required');
-    
-    const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && 
-                                  process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://your-project.supabase.co';
-    
-    let coupon;
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('coupons').select('*').eq('code', code.toUpperCase()).eq('is_active', true).single();
-      if (error || !data) throw createError.notFound('Invalid or expired coupon code');
-      coupon = data;
-    } else {
-      coupon = mockCoupons.find(c => c.code.toLowerCase() === code.toLowerCase() && c.is_active);
-      if (!coupon) throw createError.notFound('Invalid or expired coupon code');
+    if (!code) {
+      return NextResponse.json({ error: 'Coupon code is required' }, { status: 400 });
     }
     
-    if (orderTotal < coupon.min_order) {
-      throw createError.badRequest(`Minimum order value of ₹${coupon.min_order} required`);
+    const { data: coupon, error } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('code', code.toUpperCase())
+      .eq('is_active', true)
+      .single();
+    
+    if (error || !coupon) {
+      return NextResponse.json({ error: 'Invalid or expired coupon code' }, { status: 404 });
     }
     
+    // Check validity
+    if (new Date(coupon.valid_until) < new Date()) {
+      return NextResponse.json({ error: 'This coupon has expired' }, { status: 400 });
+    }
+    
+    // Check minimum order value
+    if (orderTotal < coupon.min_order_value) {
+      return NextResponse.json({ 
+        error: `Minimum order value of ₹${coupon.min_order_value} required` 
+      }, { status: 400 });
+    }
+    
+    // Calculate discount
     const discount = coupon.discount_type === 'percentage'
-      ? Math.min((orderTotal * coupon.discount) / 100, coupon.max_discount || 10000)
-      : coupon.discount;
+      ? Math.min((orderTotal * coupon.discount_value) / 100, coupon.max_discount || 10000)
+      : coupon.discount_value;
     
-    return NextResponse.json({ success: true, coupon, discount });
+    return NextResponse.json({ 
+      success: true, 
+      coupon: {
+        code: coupon.code,
+        discount_type: coupon.discount_type,
+        discount_value: coupon.discount_value,
+        discount,
+        description: coupon.description,
+      },
+      discount 
+    });
   } catch (error) {
-    const { error: errorMessage } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage }, { status: 400 });
+    console.error('Coupon validation error:', error);
+    return NextResponse.json({ error: 'Failed to validate coupon' }, { status: 500 });
   }
 }

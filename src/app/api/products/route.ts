@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { sampleProducts } from '@/data/products';
-import { handleAPIError, createError } from '@/lib/api-error';
 
 // Get all products with optional filtering
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   
+  const type = searchParams.get('type') || 'products';
   const category = searchParams.get('category');
   const search = searchParams.get('q');
   const sort = searchParams.get('sort') || 'newest';
@@ -18,84 +17,123 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '12');
   
-  const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && 
-                                process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://your-project.supabase.co';
-  
-  // Use mock data if Supabase is not configured
-  if (!isSupabaseConfigured) {
-    let products = [...sampleProducts];
-    
-    if (isFeatured === 'true') {
-      products = products.filter(p => p.is_featured);
+  // Return categories
+  if (type === 'categories') {
+    try {
+      const { data: categoriesData, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      
+      console.log('Categories query result:', { count: categoriesData?.length, error });
+      
+      if (error) throw error;
+      return NextResponse.json({ categories: categoriesData || [] });
+    } catch (error) {
+      console.error('Categories fetch error:', error);
+      return NextResponse.json({ error: 'Failed to fetch categories', details: String(error) }, { status: 500 });
     }
-    
-    if (category && category !== 'all') {
-      if (category === 'new-arrivals') {
-        products = products.filter(p => p.is_new);
-      } else if (category === 'sale') {
-        products = products.filter(p => p.original_price && p.original_price > p.price);
-      } else {
-        products = products.filter(p => p.category_id === category);
-      }
-    }
-    
-    if (search) {
-      const searchLower = search.toLowerCase();
-      products = products.filter(p => 
-        p.name.toLowerCase().includes(searchLower) ||
-        p.description.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    if (minPrice) {
-      products = products.filter(p => p.price >= parseFloat(minPrice));
-    }
-    if (maxPrice) {
-      products = products.filter(p => p.price <= parseFloat(maxPrice));
-    }
-    
-    if (sizes) {
-      const sizeArray = sizes.split(',');
-      products = products.filter(p => p.sizes.some(s => sizeArray.includes(s)));
-    }
-    
-    if (colors) {
-      const colorArray = colors.split(',');
-      products = products.filter(p => 
-        p.colors.some(c => colorArray.some(ca => c.toLowerCase().includes(ca.toLowerCase())))
-      );
-    }
-    
-    switch (sort) {
-      case 'price-asc':
-        products.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        products.sort((a, b) => b.price - a.price);
-        break;
-      case 'popular':
-        products.sort((a, b) => a.stock - b.stock);
-        break;
-      default:
-        products.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-    
-    const totalProducts = products.length;
-    const totalPages = Math.ceil(totalProducts / limit);
-    const startIndex = (page - 1) * limit;
-    const paginatedProducts = products.slice(startIndex, startIndex + limit);
-    
-    return NextResponse.json({
-      products: paginatedProducts,
-      pagination: { page, limit, totalProducts, totalPages, hasMore: page < totalPages }
-    });
   }
   
+  // Return coupons
+  if (type === 'coupons') {
+    try {
+      const { data: coupons, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('is_active', true)
+        .gte('valid_until', new Date().toISOString())
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return NextResponse.json({ coupons: coupons || [] });
+    } catch (error) {
+      console.error('Coupons fetch error:', error);
+      return NextResponse.json({ error: 'Failed to fetch coupons' }, { status: 500 });
+    }
+  }
+  
+  // Return reviews for a product
+  if (type === 'reviews') {
+    const productId = searchParams.get('productId');
+    try {
+      let query = supabase
+        .from('reviews')
+        .select('*')
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false });
+      
+      if (productId) {
+        query = query.eq('product_id', productId);
+      }
+      
+      const { data: reviews, error } = await query;
+      if (error) throw error;
+      return NextResponse.json({ reviews: reviews || [] });
+    } catch (error) {
+      console.error('Reviews fetch error:', error);
+      return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
+    }
+  }
+  
+  // Return shipping rates
+  if (type === 'shipping') {
+    try {
+      const { data: shippingRates, error } = await supabase
+        .from('shipping_zones')
+        .select('*')
+        .eq('is_active', true)
+        .order('base_rate', { ascending: true });
+      if (error) throw error;
+      return NextResponse.json({ shippingRates: shippingRates || [] });
+    } catch (error) {
+      console.error('Shipping fetch error:', error);
+      return NextResponse.json({ error: 'Failed to fetch shipping rates' }, { status: 500 });
+    }
+  }
+  
+  // Return single product by slug
+  const productSlug = searchParams.get('slug');
+  if (productSlug) {
+    try {
+      const { data: product, error } = await supabase
+        .from('products')
+        .select('*, categories(*)')
+        .eq('slug', productSlug)
+        .eq('is_active', true)
+        .single();
+      
+      if (error || !product) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+      
+      // Get reviews
+      const { data: reviews } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('product_id', product.id)
+        .eq('is_approved', true);
+      
+      const avgRating = reviews?.length > 0 
+        ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / (reviews?.length || 1)
+        : 0;
+      
+      return NextResponse.json({
+        product: { ...product, reviews: reviews || [], avgRating }
+      });
+    } catch (error) {
+      console.error('Product fetch error:', error);
+      return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 });
+    }
+  }
+  
+  // Get all products
   try {
     let query = supabase
       .from('products')
-      .select('*, categories(id, name, slug)', { count: 'exact' });
-    
+      .select('*, categories(id, name, slug)', { count: 'exact' })
+      .eq('is_active', true);
+      
     if (isFeatured === 'true') {
       query = query.eq('is_featured', true);
     }
@@ -118,8 +156,9 @@ export async function GET(request: NextRequest) {
     
     if (minPrice) query = query.gte('price', parseFloat(minPrice));
     if (maxPrice) query = query.lte('price', parseFloat(maxPrice));
-    if (sizes) query = query.overlaps('sizes', sizes.split(','));
-    if (colors) query = query.overlaps('colors', colors.split(','));
+    
+    // For size/color filtering, we need to join with product_variants
+    // The filtering will be done client-side after fetching products
     
     switch (sort) {
       case 'price-asc': query = query.order('price', { ascending: true }); break;
@@ -145,7 +184,7 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    const { error: errorMessage } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    console.error('Products fetch error:', error);
+    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
   }
 }
