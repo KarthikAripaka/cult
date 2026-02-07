@@ -3,172 +3,250 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiUserPlus } from 'react-icons/fi';
-import { useAuthStore } from '@/store';
+import { useRouter } from 'next/navigation';
+import { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiPhone } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import { useAuthStore } from '@/store';
 import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
 export default function SignupPage() {
+  const router = useRouter();
+  const { setUser } = useAuthStore();
+  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const { setUser } = useAuthStore();
+  const [loading, setLoading] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!name || !email || !password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
     
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+    
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
       return;
     }
-
-    setIsLoading(true);
-
-    // Simulate signup - replace with Supabase auth
-    setTimeout(() => {
-      const mockUser = {
-        id: '1',
+    
+    if (!agreeTerms) {
+      toast.error('Please agree to the terms and conditions');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
         email,
-        name,
-        avatar_url: '',
+        password,
+        options: {
+          data: {
+            name,
+            phone,
+          },
+        },
+      });
+      
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      
+      setUser({
+        id: data.user?.id || '',
+        email: email,
+        name: name,
         is_admin: false,
         created_at: new Date().toISOString(),
-      };
-      setUser(mockUser);
+      });
+      
       toast.success('Account created successfully!');
-      setIsLoading(false);
-    }, 1000);
+      router.push('/');
+    } catch (error) {
+      toast.error('An error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-12 bg-gray-50">
-      <div className="max-w-md mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-xl p-8"
-        >
+    <div className="min-h-screen bg-gray-50 pt-24 flex items-center justify-center py-12 px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md"
+      >
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Create Account</h1>
-            <p className="text-gray-600">Join CULT today</p>
+            <Link href="/" className="inline-block">
+              <motion.span
+                className="text-3xl font-bold tracking-tighter"
+                whileHover={{ scale: 1.05 }}
+              >
+                CULT
+              </motion.span>
+            </Link>
+            <h1 className="text-2xl font-bold mt-6 mb-2">Create Account</h1>
+            <p className="text-gray-600">Join the CULT community</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <Input
-              label="Full Name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              leftIcon={<FiUser />}
-              required
-            />
-
-            <Input
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              leftIcon={<FiMail />}
-              required
-            />
-
-            <div className="relative">
-              <Input
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password"
-                leftIcon={<FiLock />}
-                helperText="Minimum 8 characters"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-10 text-gray-400 hover:text-black"
-              >
-                {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
-              </button>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
+                />
+              </div>
             </div>
 
-            <Input
-              label="Confirm Password"
-              type={showPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your password"
-              leftIcon={<FiLock />}
-              required
-            />
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
+                />
+              </div>
+            </div>
 
-            <div className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                id="terms"
-                className="mt-1 rounded border-gray-300"
-                required
-              />
-              <label htmlFor="terms" className="text-sm text-gray-600">
-                I agree to the{' '}
-                <Link href="/shop" className="text-orange-500 hover:underline">
-                  Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link href="/shop" className="text-orange-500 hover:underline">
-                  Privacy Policy
-                </Link>
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phone Number
+              </label>
+              <div className="relative">
+                <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter your phone number"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password"
+                  className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-1 focus:ring-black transition-colors ${
+                    confirmPassword && password !== confirmPassword
+                      ? 'border-red-500'
+                      : 'border-gray-300'
+                  }`}
+                />
+              </div>
+              {confirmPassword && password !== confirmPassword && (
+                <p className="text-red-500 text-sm mt-1">Passwords do not match</p>
+              )}
+            </div>
+
+            {/* Terms */}
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="w-4 h-4 mt-1 rounded border-gray-300 text-black focus:ring-black"
+                />
+                <span className="text-sm text-gray-600">
+                  I agree to the{' '}
+                  <Link href="/help" className="text-orange-500 hover:underline">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/help" className="text-orange-500 hover:underline">
+                    Privacy Policy
+                  </Link>
+                </span>
               </label>
             </div>
 
-            <Button type="submit" fullWidth isLoading={isLoading} leftIcon={<FiUserPlus />}>
-              Create Account
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Already have an account?{' '}
-              <Link href="/auth/login" className="text-orange-500 font-medium hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </div>
-
-          <div className="mt-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <button className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-                Google
-              </button>
-              <button className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" alt="Facebook" className="w-5 h-5" />
-                Facebook
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </div>
+          {/* Login Link */}
+          <p className="text-center text-gray-600 mt-6">
+            Already have an account?{' '}
+            <Link href="/auth/login" className="text-orange-500 hover:underline font-medium">
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </motion.div>
     </div>
   );
 }

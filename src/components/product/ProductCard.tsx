@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { FiHeart, FiShoppingBag, FiEye } from 'react-icons/fi';
+import { FiHeart, FiShoppingBag, FiEye, FiStar } from 'react-icons/fi';
 import { Product } from '@/types';
 import { useCartStore, useAuthStore, useUIStore } from '@/store';
 import toast from 'react-hot-toast';
@@ -12,9 +12,10 @@ import toast from 'react-hot-toast';
 interface ProductCardProps {
   product: Product;
   index?: number;
+  viewMode?: 'grid' | 'list';
 }
 
-const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
+const ProductCard = ({ product, index = 0, viewMode = 'grid' }: ProductCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const { addItem } = useCartStore();
@@ -50,20 +51,20 @@ const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.1 }}
-      className="product-card group"
+      className={`product-card group ${viewMode === 'list' ? 'flex gap-6' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Link href={`/product/${product.slug}`}>
+      <Link href={`/product/${product.slug}`} className={viewMode === 'list' ? 'flex gap-6 w-full' : 'block'}>
         {/* Image Container */}
-        <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
+        <div className={`relative overflow-hidden bg-gray-100 ${viewMode === 'list' ? 'w-64 flex-shrink-0 aspect-[3/4]' : 'aspect-[3/4]'}`}>
           {product.images[0] && (
             <Image
               src={product.images[0]}
               alt={product.name}
               fill
               className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              sizes={viewMode === 'list' ? "256px" : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"}
             />
           )}
 
@@ -140,11 +141,11 @@ const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
         </div>
 
         {/* Product Info */}
-        <div className="p-4">
+        <div className={`${viewMode === 'list' ? 'flex-1 py-4' : 'p-4'}`}>
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
             {product.category?.name || 'Fashion'}
           </p>
-          <h3 className="font-medium text-gray-900 line-clamp-1 group-hover:text-orange-500 transition-colors">
+          <h3 className="font-medium text-gray-900 group-hover:text-orange-500 transition-colors">
             {product.name}
           </h3>
           <div className="mt-2 flex items-center gap-2">
@@ -157,19 +158,38 @@ const ProductCard = ({ product, index = 0 }: ProductCardProps) => {
               </span>
             )}
           </div>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {product.colors.slice(0, 4).map((color) => (
-              <span
-                key={color}
-                className="w-5 h-5 rounded-full border border-gray-200"
-                style={{ backgroundColor: color.toLowerCase() }}
-                title={color}
-              />
+          <p className="mt-3 text-gray-600 text-sm line-clamp-2">
+            {product.description}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {product.sizes.slice(0, 5).map((size) => (
+              <span key={size} className="px-3 py-1 text-xs border border-gray-300 rounded">
+                {size}
+              </span>
             ))}
-            {product.colors.length > 4 && (
-              <span className="text-xs text-gray-500">+{product.colors.length - 4}</span>
-            )}
           </div>
+          <div className="mt-4 flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, i) => (
+                <FiStar
+                  key={i}
+                  size={14}
+                  className={i < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-gray-500">(127 reviews)</span>
+          </div>
+          {viewMode === 'list' && (
+            <div className="mt-6 flex gap-3">
+              <Button size="sm" onClick={handleQuickAdd}>
+                Add to Cart
+              </Button>
+              <Button variant="outline" size="sm">
+                View Details
+              </Button>
+            </div>
+          )}
         </div>
       </Link>
     </motion.div>

@@ -7,8 +7,7 @@ import Image from 'next/image';
 import { FiArrowRight, FiStar, FiTruck, FiRefreshCw, FiShield, FiShoppingBag, FiTrendingUp, FiInstagram, FiChevronDown } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/product/ProductCard';
-import { sampleProducts } from '@/data/products';
-import { Product } from '@/types';
+import { Product, Category } from '@/types';
 
 // Hero Slides Data - Modern Dress Images (No People)
 const heroSlides = [
@@ -36,7 +35,7 @@ const heroSlides = [
 ];
 
 // Categories Data
-const categories = [
+const defaultCategories = [
   { name: 'New Arrivals', image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&q=80', slug: 'new-arrivals' },
   { name: 'Men', image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&q=80', slug: 'men' },
   { name: 'Accessories', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80', slug: 'accessories' },
@@ -51,9 +50,6 @@ const features = [
   { icon: FiShoppingBag, title: 'Quality Guarantee', desc: 'Premium materials' },
 ];
 
-// Get featured products for homepage
-const featuredProducts = sampleProducts.filter(p => p.is_featured).slice(0, 4);
-
 // Animated Headlines
 const headlines = [
   'TRENDING NOW',
@@ -65,6 +61,36 @@ const headlines = [
 export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentHeadline, setCurrentHeadline] = useState(0);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>(defaultCategories as Category[]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch featured products and categories
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch featured products
+        const productsResponse = await fetch('/api/products?is_featured=true&limit=4');
+        const productsData = await productsResponse.json();
+        if (productsData.products) {
+          setFeaturedProducts(productsData.products);
+        }
+
+        // Fetch categories
+        const categoriesResponse = await fetch('/api/categories');
+        const categoriesData = await categoriesResponse.json();
+        if (categoriesData.categories) {
+          setCategories(categoriesData.categories.slice(0, 4));
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Auto-rotate hero slides
   useEffect(() => {
@@ -232,7 +258,7 @@ export default function HomePage() {
                 <Link href="/shop" className="group block">
                   <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
                     <Image
-                      src={category.image}
+                      src={category.image_url}
                       alt={category.name}
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-110"

@@ -5,18 +5,30 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Toaster } from 'react-hot-toast';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const inter = Inter({ 
+  subsets: ['latin'], 
+  variable: '--font-inter',
+  display: 'swap',
+  fallback: ['system-ui', 'sans-serif']
+});
 
 export const metadata: Metadata = {
   title: 'CULT | Premium Fashion',
   description: 'Discover the finest luxury fashion pieces. Shop premium clothing, accessories, and more.',
   keywords: ['fashion', 'luxury', 'premium clothing', 'designer wear', 'online shopping'],
   authors: [{ name: 'CULT' }],
+  metadataBase: new URL('http://localhost:3000'),
   openGraph: {
     title: 'CULT | Premium Fashion',
     description: 'Discover the finest luxury fashion pieces.',
     type: 'website',
     locale: 'en_US',
+    siteName: 'CULT',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CULT | Premium Fashion',
+    description: 'Discover the finest luxury fashion pieces.',
   },
 };
 
