@@ -6,6 +6,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCartStore, useAuthStore, useUIStore } from '@/store';
 import Button from '@/components/ui/Button';
+import { SHIPPING_THRESHOLD, SHIPPING_COST } from '@/constants/shipping';
+import { useRouter } from 'next/navigation';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -13,22 +15,22 @@ interface CartSidebarProps {
 }
 
 const CartSidebar = ({ isOpen, onClose }: CartSidebarProps) => {
-  const { items, removeItem, updateQuantity, getTotal, clearCart } = useCartStore();
+  const router = useRouter();
+  const { items, removeItem, updateQuantity, getTotal } = useCartStore();
   const { user } = useAuthStore();
   const { toggleCart } = useUIStore();
 
   const subtotal = getTotal();
-  const shipping = subtotal > 2000 ? 0 : 150;
+  const shipping = subtotal > SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
   const total = subtotal + shipping;
 
   const handleCheckout = () => {
+    toggleCart();
     if (!user) {
-      toggleCart();
-      // Redirect to login
+      router.push('/auth/login');
       return;
     }
-    // Proceed to checkout
-    toggleCart();
+    router.push('/checkout');
   };
 
   return (

@@ -36,10 +36,11 @@ const heroSlides = [
 
 // Categories Data
 const defaultCategories = [
-  { name: 'New Arrivals', image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&q=80', slug: 'new-arrivals' },
-  { name: 'Men', image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&q=80', slug: 'men' },
-  { name: 'Accessories', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80', slug: 'accessories' },
-  { name: 'Sale', image: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=600&q=80', slug: 'sale' },
+  { id: '1', name: 'New Arrivals', image_url: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&q=80', slug: 'new-arrivals', created_at: '' },
+  { id: '2', name: 'Men', image_url: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=600&q=80', slug: 'men', created_at: '' },
+  { id: '3', name: 'Women', image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=80', slug: 'women', created_at: '' },
+  { id: '4', name: 'Accessories', image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80', slug: 'accessories', created_at: '' },
+  { id: '5', name: 'Sale', image_url: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=600&q=80', slug: 'sale', created_at: '' },
 ];
 
 // Features Data

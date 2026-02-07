@@ -8,6 +8,7 @@ import { FiTrash2, FiPlus, FiMinus, FiShoppingBag, FiArrowRight, FiTag } from 'r
 import Button from '@/components/ui/Button';
 import { useCartStore, useAuthStore } from '@/store';
 import toast from 'react-hot-toast';
+import { SHIPPING_THRESHOLD, SHIPPING_COST, TAX_RATE } from '@/constants/shipping';
 
 export default function CartPage() {
   const { user } = useAuthStore();
@@ -17,8 +18,8 @@ export default function CartPage() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   const subtotal = getTotal();
-  const shipping = subtotal > 2000 ? 0 : 150;
-  const tax = Math.round(subtotal * 0.18 * 100) / 100;
+  const shipping = subtotal > SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
   const discount = appliedCoupon 
     ? appliedCoupon.discount_type === 'percentage'
       ? Math.min((subtotal * appliedCoupon.discount) / 100, appliedCoupon.max_discount || 10000)

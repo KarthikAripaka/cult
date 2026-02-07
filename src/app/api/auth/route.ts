@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { handleAPIError, createError } from '@/lib/api-error';
+import { VALIDATION_PATTERNS } from '@/constants/shipping';
 
 // Sign up
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email, password, name } = body;
-    
+
     if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+      throw createError.badRequest('Email and password are required');
     }
-    
+
+    if (!VALIDATION_PATTERNS.EMAIL.test(email)) {
+      throw createError.badRequest('Please enter a valid email address');
+    }
+
+    if (password.length < 8) {
+      throw createError.badRequest('Password must be at least 8 characters');
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -20,18 +30,19 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-    
+
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      throw createError.badRequest(error.message);
     }
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       user: data.user,
       message: 'Registration successful! Please check your email to verify.'
     });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to sign up' }, { status: 500 });
+    const { error: errorMessage, code } = handleAPIError(error);
+    return NextResponse.json({ error: errorMessage, code }, { status: 400 });
   }
 }
 
@@ -40,27 +51,28 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { email, password } = body;
-    
+
     if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+      throw createError.badRequest('Email and password are required');
     }
-    
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    
+
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 401 });
+      throw createError.unauthorized('Invalid email or password');
     }
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       user: data.user,
       session: data.session
     });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to sign in' }, { status: 500 });
+    const { error: errorMessage, code } = handleAPIError(error);
+    return NextResponse.json({ error: errorMessage, code }, { status: 401 });
   }
 }
 
@@ -68,34 +80,17 @@ export async function PUT(request: NextRequest) {
 export async function DELETE() {
   try {
     const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    
-    return NextResponse.json({ success: true, message: 'Signed out successfully' });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 });
-  }
-}
 
-// Get current user
-export async function GET(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
-      return NextResponse.json({ error: 'No authorization header' }, { status: 401 });
-    }
-    
-    const { data, error } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-    
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 401 });
+      throw createError.internal(error.message);
     }
-    
-    return NextResponse.json({ user: data.user });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Successfully signed out'
+    });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to get user' }, { status: 500 });
+    const { error: errorMessage } = handleAPIError(error);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

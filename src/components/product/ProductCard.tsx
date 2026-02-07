@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { FiHeart, FiShoppingBag, FiEye, FiStar } from 'react-icons/fi';
+import { FiHeart, FiShoppingBag, FiEye } from 'react-icons/fi';
 import { Product } from '@/types';
 import { useCartStore, useAuthStore, useUIStore } from '@/store';
 import toast from 'react-hot-toast';
@@ -15,19 +15,23 @@ interface ProductCardProps {
   viewMode?: 'grid' | 'list';
 }
 
-const ProductCard = ({ product, index = 0, viewMode = 'grid' }: ProductCardProps) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
+// Memoized component for performance
+const ProductCard = memo(function ProductCard({ 
+  product, 
+  index = 0, 
+  viewMode = 'grid' 
+}: ProductCardProps) {
   const { addItem } = useCartStore();
   const { user } = useAuthStore();
   const { toggleCart } = useUIStore();
 
   const isOnSale = product.original_price && product.original_price > product.price;
+  
   const discount = isOnSale
     ? Math.round(((product.original_price! - product.price) / product.original_price!) * 100)
     : 0;
 
-  const handleQuickAdd = (e: React.MouseEvent) => {
+  const handleQuickAdd = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -36,24 +40,31 @@ const ProductCard = ({ product, index = 0, viewMode = 'grid' }: ProductCardProps
       return;
     }
 
-    if (product.sizes.length > 0 && product.colors.length > 0) {
-      addItem(product, product.sizes[0], product.colors[0], 1, user.id);
-    } else {
-      addItem(product, 'One Size', 'Default', 1, user.id);
-    }
+    const size = product.sizes.length > 0 ? product.sizes[0] : 'One Size';
+    const color = product.colors.length > 0 ? product.colors[0] : 'Default';
 
+    addItem(product, size, color, 1, user.id);
     toast.success(`${product.name} added to cart`);
     toggleCart();
-  };
+  }, [user, product, addItem, toggleCart]);
+
+  const handleWishlist = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toast.success('Added to wishlist!');
+  }, []);
+
+  const imageSizes = viewMode === 'list' 
+    ? "256px" 
+    : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw";
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.1 }}
+      whileHover={{ y: -5 }}
       className={`product-card group ${viewMode === 'list' ? 'flex gap-6' : ''}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <Link href={`/product/${product.slug}`} className={viewMode === 'list' ? 'flex gap-6 w-full' : 'block'}>
         {/* Image Container */}
@@ -64,136 +75,97 @@ const ProductCard = ({ product, index = 0, viewMode = 'grid' }: ProductCardProps
               alt={product.name}
               fill
               className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-              sizes={viewMode === 'list' ? "256px" : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"}
+              sizes={imageSizes}
+              priority={index < 4}
             />
           )}
 
           {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
-            {product.is_new && (
-              <span className="badge-new px-2 py-1 text-xs font-medium">
-                NEW
-              </span>
-            )}
-            {isOnSale && (
-              <span className="badge-sale px-2 py-1 text-xs font-medium">
-                -{discount}%
-              </span>
-            )}
-            {product.is_featured && (
-              <span className="badge-featured px-2 py-1 text-xs font-medium">
-                FEATURED
-              </span>
-            )}
-          </div>
+          {(product.is_new || isOnSale || product.is_featured) && (
+            <div className="absolute top-3 left-3 flex flex-col gap-2">
+              {product.is_new && (
+                <span className="badge-new px-2 py-1 text-xs font-medium">
+                  NEW
+                </span>
+              )}
+              {isOnSale && (
+                <span className="badge-sale px-2 py-1 text-xs font-medium">
+                  -{discount}%
+                </span>
+              )}
+              {product.is_featured && !isOnSale && (
+                <span className="badge-featured px-2 py-1 text-xs font-medium">
+                  FEATURED
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Quick Actions */}
-          <div
-            className={`absolute top-3 right-3 flex flex-col gap-2 transition-all duration-300 ${
-              isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2'
-            }`}
-          >
+          <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={(e) => {
-                e.preventDefault();
-                setIsWishlisted(!isWishlisted);
-              }}
-              className={`p-2 rounded-full shadow-lg transition-colors ${
-                isWishlisted
-                  ? 'bg-red-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-black hover:text-white'
-              }`}
+              onClick={handleWishlist}
+              className="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50"
             >
-              <FiHeart size={16} fill={isWishlisted ? 'currentColor' : 'none'} />
+              <FiHeart size={18} />
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={handleQuickAdd}
-              className="p-2 bg-white text-gray-700 rounded-full shadow-lg hover:bg-black hover:text-white transition-colors"
+              className="w-10 h-10 bg-black text-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-800"
             >
-              <FiShoppingBag size={16} />
+              <FiShoppingBag size={18} />
             </motion.button>
           </div>
-
-          {/* Quick View Button */}
-          <motion.div
-            className={`absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent transition-all duration-300 ${
-              isHovered ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            <button className="w-full py-2 bg-white/90 text-black font-medium text-sm rounded hover:bg-white transition-colors flex items-center justify-center gap-2">
-              <FiEye size={14} />
-              Quick View
-            </button>
-          </motion.div>
-
-          {/* Out of Stock Overlay */}
-          {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <span className="bg-white px-4 py-2 font-medium text-sm">
-                Out of Stock
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Product Info */}
-        <div className={`${viewMode === 'list' ? 'flex-1 py-4' : 'p-4'}`}>
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-            {product.category?.name || 'Fashion'}
-          </p>
-          <h3 className="font-medium text-gray-900 group-hover:text-orange-500 transition-colors">
+        <div className={`p-4 ${viewMode === 'list' ? 'flex-1 flex flex-col justify-center' : ''}`}>
+          <h3 className="font-medium text-gray-900 group-hover:text-orange-500 transition-colors line-clamp-2">
             {product.name}
           </h3>
-          <div className="mt-2 flex items-center gap-2">
-            <span className={`font-semibold ${isOnSale ? 'text-orange-500' : 'text-black'}`}>
-              ₹{product.price.toLocaleString()}
-            </span>
+          <p className="text-gray-500 text-sm mt-1 line-clamp-2">{product.description}</p>
+          
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-lg font-bold">₹{product.price}</span>
             {isOnSale && (
               <span className="text-gray-400 line-through text-sm">
-                ₹{product.original_price!.toLocaleString()}
+                ₹{product.original_price}
               </span>
             )}
           </div>
-          <p className="mt-3 text-gray-600 text-sm line-clamp-2">
-            {product.description}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {product.sizes.slice(0, 5).map((size) => (
-              <span key={size} className="px-3 py-1 text-xs border border-gray-300 rounded">
-                {size}
-              </span>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              {[...Array(5)].map((_, i) => (
-                <FiStar
-                  key={i}
-                  size={14}
-                  className={i < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}
+
+          {/* Colors */}
+          {viewMode === 'grid' && product.colors.length > 0 && (
+            <div className="flex gap-1 mt-3">
+              {product.colors.slice(0, 4).map((color, idx) => (
+                <div
+                  key={idx}
+                  className="w-5 h-5 rounded-full border border-gray-200"
+                  style={{ backgroundColor: color.toLowerCase() }}
+                  title={color}
                 />
               ))}
-            </div>
-            <span className="text-xs text-gray-500">(127 reviews)</span>
-          </div>
-          {viewMode === 'list' && (
-            <div className="mt-6 flex gap-3">
-              <Button size="sm" onClick={handleQuickAdd}>
-                Add to Cart
-              </Button>
-              <Button variant="outline" size="sm">
-                View Details
-              </Button>
+              {product.colors.length > 4 && (
+                <span className="text-xs text-gray-500 ml-1">+{product.colors.length - 4}</span>
+              )}
             </div>
           )}
+
+          {/* Quick Add Button (Mobile) */}
+          <button
+            onClick={handleQuickAdd}
+            className="mt-4 w-full py-2 bg-black text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity lg:hidden"
+          >
+            Quick Add
+          </button>
         </div>
       </Link>
     </motion.div>
   );
-};
+});
 
 export default ProductCard;
