@@ -1,60 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { handleAPIError, createError } from '@/lib/api-error';
-import { VALIDATION_PATTERNS } from '@/constants/shipping';
 
-// In-memory subscribers storage (replace with database in production)
-const subscribers: Set<string> = new Set();
-
+// Newsletter API
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email } = body;
 
     if (!email) {
-      throw createError.badRequest('Email is required');
+      return NextResponse.json(
+        { error: 'Email is required' },
+        { status: 400 }
+      );
     }
 
-    if (!VALIDATION_PATTERNS.EMAIL.test(email)) {
-      throw createError.badRequest('Please enter a valid email address');
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
     }
 
-    if (subscribers.has(email)) {
-      throw createError.conflict('Email already subscribed');
-    }
-
-    subscribers.add(email);
+    // In production, you would:
+    // 1. Add to your email marketing service (Mailchimp, SendGrid, etc.)
+    // 2. Store in your database
+    // 3. Send confirmation email
+    
+    // For demo purposes, just return success
+    console.log('Newsletter subscription:', email);
 
     return NextResponse.json({
       success: true,
-      message: 'Successfully subscribed to newsletter!'
+      message: 'Successfully subscribed to newsletter!',
     });
+
   } catch (error) {
-    const { error: errorMessage, code } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage, code }, { status: code === 'CONFLICT' ? 409 : 400 });
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get('email');
-
-    if (!email) {
-      throw createError.badRequest('Email is required');
-    }
-
-    if (!subscribers.has(email)) {
-      throw createError.notFound('Email not found in subscribers');
-    }
-
-    subscribers.delete(email);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Successfully unsubscribed from newsletter'
-    });
-  } catch (error) {
-    const { error: errorMessage, code } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage, code }, { status: 400 });
+    console.error('Newsletter subscription error:', error);
+    return NextResponse.json(
+      { error: 'Failed to subscribe' },
+      { status: 500 }
+    );
   }
 }

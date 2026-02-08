@@ -5,12 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { FiGrid, FiList, FiFilter, FiX, FiChevronDown, FiStar, FiShoppingBag, FiHeart } from 'react-icons/fi';
+import { FiGrid, FiList, FiFilter, FiX, FiChevronDown, FiShoppingBag } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/product/ProductCard';
-import { Product } from '@/types';
-import toast from 'react-hot-toast';
+import { Product, Category } from '@/types';
 import { useCartStore } from '@/store';
+import toast from 'react-hot-toast';
 
 const sortOptions = [
   { value: 'newest', label: 'Newest' },
@@ -20,14 +20,6 @@ const sortOptions = [
 ];
 
 const filterOptions = {
-  categories: [
-    { value: 'all', label: 'All Products' },
-    { value: 'new-arrivals', label: 'New Arrivals' },
-    { value: 'men', label: 'Men' },
-    { value: 'women', label: 'Women' },
-    { value: 'accessories', label: 'Accessories' },
-    { value: 'sale', label: 'Sale' },
-  ],
   sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', '36', '38', '40', 'One Size'],
   colors: [
     { value: 'black', label: 'Black', hex: '#000000' },
@@ -53,6 +45,7 @@ function ShopContent() {
   const { addItem } = useCartStore();
   
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -66,6 +59,20 @@ function ShopContent() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+        setCategories(data.categories || []);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
   
   // Fetch products
   useEffect(() => {
@@ -142,6 +149,14 @@ function ShopContent() {
   const hasActiveFilters = selectedCategory !== 'all' || selectedSizes.length > 0 || 
     selectedColors.length > 0 || priceRange !== '';
   
+  // Get page title
+  const getPageTitle = () => {
+    if (selectedCategory === 'all') return 'Shop All';
+    if (selectedCategory === 'new-arrivals') return 'New Arrivals';
+    const category = categories.find(c => c.slug === selectedCategory);
+    return category?.name || selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1);
+  };
+  
   return (
     <div className="min-h-screen bg-gray-50 pt-24">
       {/* Page Header */}
@@ -152,9 +167,7 @@ function ShopContent() {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-bold mb-4"
           >
-            {selectedCategory === 'all' ? 'Shop All' : 
-             selectedCategory === 'new-arrivals' ? 'New Arrivals' :
-             selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
+            {getPageTitle()}
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -248,16 +261,36 @@ function ShopContent() {
               <div className="mb-8">
                 <h4 className="font-medium mb-4">Category</h4>
                 <div className="space-y-2">
-                  {filterOptions.categories.map(category => (
-                    <label key={category.value} className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="category"
+                      checked={selectedCategory === 'all'}
+                      onChange={() => { setSelectedCategory('all'); setCurrentPage(1); }}
+                      className="w-4 h-4 text-black focus:ring-black border-gray-300"
+                    />
+                    <span className="text-sm">All Products</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="category"
+                      checked={selectedCategory === 'new-arrivals'}
+                      onChange={() => { setSelectedCategory('new-arrivals'); setCurrentPage(1); }}
+                      className="w-4 h-4 text-black focus:ring-black border-gray-300"
+                    />
+                    <span className="text-sm">New Arrivals</span>
+                  </label>
+                  {categories.map(category => (
+                    <label key={category.id} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="radio"
                         name="category"
-                        checked={selectedCategory === category.value}
-                        onChange={() => { setSelectedCategory(category.value); setCurrentPage(1); }}
+                        checked={selectedCategory === category.slug}
+                        onChange={() => { setSelectedCategory(category.slug); setCurrentPage(1); }}
                         className="w-4 h-4 text-black focus:ring-black border-gray-300"
                       />
-                      <span className="text-sm">{category.label}</span>
+                      <span className="text-sm">{category.name}</span>
                     </label>
                   ))}
                 </div>

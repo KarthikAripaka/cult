@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Only create client if credentials are available
+const getSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
 
 // GET orders for logged-in user
 export async function GET(request: NextRequest) {
@@ -16,6 +22,21 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
+
+    const supabase = getSupabaseClient();
+
+    // Return empty orders if Supabase is not configured or no user
+    if (!supabase || !userId) {
+      return NextResponse.json({
+        orders: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 1,
+        },
+      });
+    }
 
     if (orderId) {
       // Get single order
@@ -29,6 +50,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(
           { error: 'Order not found' },
           { status: 404 }
+        );
+      }
+
+      // Ensure user can only see their own orders
+      if (order.user_id && order.user_id !== userId) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
         );
       }
 
@@ -57,11 +86,8 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('orders')
       .select('*', { count: 'exact' })
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
-
-    if (userId) {
-      query = query.eq('user_id', userId);
-    }
 
     if (status) {
       query = query.eq('status', status);
@@ -106,6 +132,16 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const { orderId, status, description, userId, isAdmin } = body;
+
+    const supabase = getSupabaseClient();
+
+    // Return error if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
 
     if (!orderId || !status) {
       return NextResponse.json(

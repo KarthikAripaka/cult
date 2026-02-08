@@ -1,96 +1,101 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { handleAPIError, createError } from '@/lib/api-error';
-import { VALIDATION_PATTERNS } from '@/constants/shipping';
+import { createClient } from '@supabase/supabase-js';
 
-// Sign up
-export async function POST(request: NextRequest) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+const getSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
+
+// GET user profile
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, password, name } = body;
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
 
-    if (!email || !password) {
-      throw createError.badRequest('Email and password are required');
+    const supabase = getSupabaseClient();
+
+    if (!supabase || !userId) {
+      return NextResponse.json({
+        user: null,
+        demoMode: true,
+      });
     }
 
-    if (!VALIDATION_PATTERNS.EMAIL.test(email)) {
-      throw createError.badRequest('Please enter a valid email address');
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error || !user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
     }
 
-    if (password.length < 8) {
-      throw createError.badRequest('Password must be at least 8 characters');
-    }
+    return NextResponse.json({ user });
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: name || '',
-        },
-      },
-    });
-
-    if (error) {
-      throw createError.badRequest(error.message);
-    }
-
-    return NextResponse.json({
-      success: true,
-      user: data.user,
-      message: 'Registration successful! Please check your email to verify.'
-    });
   } catch (error) {
-    const { error: errorMessage, code } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage, code }, { status: 400 });
+    console.error('Auth API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
-// Sign in
-export async function PUT(request: NextRequest) {
+// UPDATE user profile
+export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { userId, name, phone, avatar_url } = body;
 
-    if (!email || !password) {
-      throw createError.badRequest('Email and password are required');
+    const supabase = getSupabaseClient();
+
+    if (!supabase || !userId) {
+      return NextResponse.json({
+        success: true,
+        demoMode: true,
+        message: 'Profile updated in demo mode',
+      });
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data: user, error } = await supabase
+      .from('users')
+      .update({
+        name,
+        phone,
+        avatar_url,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select()
+      .single();
 
     if (error) {
-      throw createError.unauthorized('Invalid email or password');
+      console.error('Profile update error:', error);
+      return NextResponse.json(
+        { error: 'Failed to update profile' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      user: data.user,
-      session: data.session
+      user,
     });
+
   } catch (error) {
-    const { error: errorMessage, code } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage, code }, { status: 401 });
-  }
-}
-
-// Sign out
-export async function DELETE() {
-  try {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      throw createError.internal(error.message);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Successfully signed out'
-    });
-  } catch (error) {
-    const { error: errorMessage } = handleAPIError(error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    console.error('Auth API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

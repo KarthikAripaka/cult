@@ -116,10 +116,10 @@ export default function CartPage() {
               >
                 {/* Product Image */}
                 <Link href={`/product/${item.product?.slug}`} className="relative w-28 h-36 flex-shrink-0">
-                  {item.product?.images[0] && (
+                  {item.product?.images?.[0] && (
                     <Image
                       src={item.product.images[0]}
-                      alt={item.product.name}
+                      alt={item.product?.name || 'Product'}
                       fill
                       className="object-cover rounded-lg"
                     />

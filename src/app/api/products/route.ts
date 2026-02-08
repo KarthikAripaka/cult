@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { products, categories, getFeaturedProducts, getNewProducts, searchProducts, filterProducts } from '@/data/products';
+
+// Check if Supabase is configured
+function isSupabaseConfigured(): boolean {
+  return !!(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && 
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://your-project.supabase.co' &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'your-anon-key'
+  );
+}
 
 // Get all products with optional filtering
 export async function GET(request: NextRequest) {
@@ -11,12 +22,103 @@ export async function GET(request: NextRequest) {
   const sort = searchParams.get('sort') || 'newest';
   const minPrice = searchParams.get('minPrice');
   const maxPrice = searchParams.get('maxPrice');
-  const sizes = searchParams.get('sizes');
-  const colors = searchParams.get('colors');
   const isFeatured = searchParams.get('is_featured');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '12');
   
+  // Use demo data if Supabase is not configured
+  if (!isSupabaseConfigured()) {
+    // Return categories
+    if (type === 'categories') {
+      return NextResponse.json({ categories });
+    }
+    
+    // Return coupons (demo)
+    if (type === 'coupons') {
+      return NextResponse.json({ coupons: [] });
+    }
+    
+    // Return reviews (demo)
+    if (type === 'reviews') {
+      return NextResponse.json({ reviews: [] });
+    }
+    
+    // Get all products with filtering
+    let filteredProducts = [...products];
+    
+    // Filter by featured
+    if (isFeatured === 'true') {
+      filteredProducts = getFeaturedProducts();
+    }
+    
+    // Filter by category
+    if (category && category !== 'all') {
+      const categoryMap: Record<string, string> = {
+        'shirts': 'Shirts',
+        'hoodies': 'Hoodies',
+        'pants': 'Pants',
+        'baggies': 'Baggies',
+        'torn-jeans': 'Torn Jeans',
+        'new-arrivals': 'new',
+      };
+      
+      if (category === 'new-arrivals') {
+        filteredProducts = getNewProducts();
+      } else {
+        const categoryName = categoryMap[category] || category;
+        filteredProducts = filteredProducts.filter(p => 
+          p.category.toLowerCase() === categoryName.toLowerCase()
+        );
+      }
+    }
+    
+    // Search
+    if (search) {
+      filteredProducts = searchProducts(search);
+    }
+    
+    // Price filter
+    if (minPrice) {
+      filteredProducts = filteredProducts.filter(p => p.price >= parseFloat(minPrice));
+    }
+    if (maxPrice) {
+      filteredProducts = filteredProducts.filter(p => p.price <= parseFloat(maxPrice));
+    }
+    
+    // Sort
+    switch (sort) {
+      case 'price-asc':
+        filteredProducts.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-desc':
+        filteredProducts.sort((a, b) => b.price - a.price);
+        break;
+      case 'popular':
+        filteredProducts.sort((a, b) => b.reviewCount - a.reviewCount);
+        break;
+      default:
+        filteredProducts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    
+    // Pagination
+    const totalProducts = filteredProducts.length;
+    const totalPages = Math.ceil(totalProducts / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedProducts = filteredProducts.slice(startIndex, startIndex + limit);
+    
+    return NextResponse.json({
+      products: paginatedProducts,
+      pagination: {
+        page,
+        limit,
+        totalProducts,
+        totalPages,
+        hasMore: page < totalPages
+      }
+    });
+  }
+  
+  // Use Supabase database
   // Return categories
   if (type === 'categories') {
     try {
@@ -25,8 +127,6 @@ export async function GET(request: NextRequest) {
         .select('*')
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
-      
-      console.log('Categories query result:', { count: categoriesData?.length, error });
       
       if (error) throw error;
       return NextResponse.json({ categories: categoriesData || [] });
@@ -43,13 +143,13 @@ export async function GET(request: NextRequest) {
         .from('coupons')
         .select('*')
         .eq('is_active', true)
-        .gte('valid_until', new Date().toISOString())
         .order('created_at', { ascending: false });
+      
       if (error) throw error;
       return NextResponse.json({ coupons: coupons || [] });
     } catch (error) {
       console.error('Coupons fetch error:', error);
-      return NextResponse.json({ error: 'Failed to fetch coupons' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch coupons', details: String(error) }, { status: 500 });
     }
   }
   
@@ -72,58 +172,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ reviews: reviews || [] });
     } catch (error) {
       console.error('Reviews fetch error:', error);
-      return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 });
-    }
-  }
-  
-  // Return shipping rates
-  if (type === 'shipping') {
-    try {
-      const { data: shippingRates, error } = await supabase
-        .from('shipping_zones')
-        .select('*')
-        .eq('is_active', true)
-        .order('base_rate', { ascending: true });
-      if (error) throw error;
-      return NextResponse.json({ shippingRates: shippingRates || [] });
-    } catch (error) {
-      console.error('Shipping fetch error:', error);
-      return NextResponse.json({ error: 'Failed to fetch shipping rates' }, { status: 500 });
-    }
-  }
-  
-  // Return single product by slug
-  const productSlug = searchParams.get('slug');
-  if (productSlug) {
-    try {
-      const { data: product, error } = await supabase
-        .from('products')
-        .select('*, categories(*)')
-        .eq('slug', productSlug)
-        .eq('is_active', true)
-        .single();
-      
-      if (error || !product) {
-        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-      }
-      
-      // Get reviews
-      const { data: reviews } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('product_id', product.id)
-        .eq('is_approved', true);
-      
-      const avgRating = reviews?.length > 0 
-        ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / (reviews?.length || 1)
-        : 0;
-      
-      return NextResponse.json({
-        product: { ...product, reviews: reviews || [], avgRating }
-      });
-    } catch (error) {
-      console.error('Product fetch error:', error);
-      return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch reviews', details: String(error) }, { status: 500 });
     }
   }
   
@@ -157,9 +206,6 @@ export async function GET(request: NextRequest) {
     if (minPrice) query = query.gte('price', parseFloat(minPrice));
     if (maxPrice) query = query.lte('price', parseFloat(maxPrice));
     
-    // For size/color filtering, we need to join with product_variants
-    // The filtering will be done client-side after fetching products
-    
     switch (sort) {
       case 'price-asc': query = query.order('price', { ascending: true }); break;
       case 'price-desc': query = query.order('price', { ascending: false }); break;
@@ -174,8 +220,24 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error;
     
+    // For each product, fetch variants to get sizes/colors
+    const productsWithVariants = await Promise.all(
+      (products || []).map(async (product) => {
+        const { data: variants } = await supabase
+          .from('product_variants')
+          .select('size, color')
+          .eq('product_id', product.id)
+          .eq('is_active', true);
+        
+        const sizes = Array.from(new Set(variants?.map(v => v.size).filter(Boolean)));
+        const colors = Array.from(new Set(variants?.map(v => v.color).filter(Boolean)));
+        
+        return { ...product, sizes, colors };
+      })
+    );
+    
     return NextResponse.json({
-      products: products || [],
+      products: productsWithVariants || [],
       pagination: {
         page, limit,
         totalProducts: count || 0,
@@ -185,6 +247,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Products fetch error:', error);
-    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch products', details: String(error) }, { status: 500 });
   }
 }

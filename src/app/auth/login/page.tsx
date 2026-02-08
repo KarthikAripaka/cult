@@ -55,9 +55,12 @@ export default function LoginPage() {
         id: 'demo-user',
         email: 'demo@cult.com',
         name: 'Demo User',
-        avatar_url: null,
+        avatar_url: undefined,
+        phone: undefined,
         is_admin: false,
+        is_active: true,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
       toast.success('Welcome to Demo Mode!');
       setLocalLoading(false);

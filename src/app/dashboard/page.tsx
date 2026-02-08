@@ -28,7 +28,8 @@ const mockAddresses = [
 
 function OrdersView() {
   const { user } = useAuthStore();
-  const [orders, setOrders] = useState<Order[]>([]);
+  // Use any type since Order type doesn't match the database response exactly
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,9 +40,7 @@ function OrdersView() {
       }
 
       try {
-        const response = await fetch('/api/cart', {
-          headers: { 'x-user-id': user.id }
-        });
+        const response = await fetch('/api/orders?userId=' + user.id);
         const data = await response.json();
 
         if (data.orders) {
@@ -122,7 +121,7 @@ function OrdersView() {
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-gray-600">{(typeof order.items === 'string' ? JSON.parse(order.items) : order.items).length} items</p>
+              <p className="text-gray-600">{(order.items as any[] || []).length} items</p>
               <p className="font-bold text-lg">₹{order.total}</p>
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 flex gap-3">
@@ -137,6 +136,13 @@ function OrdersView() {
 }
 
 function WishlistView() {
+  // Mock wishlist data for demo mode
+  const mockWishlist = [
+    { id: '1', name: 'Premium Cotton T-Shirt', price: 49.99 },
+    { id: '5', name: 'Urban Jacket', price: 149.99 },
+    { id: '11', name: 'Puffer Jacket', price: 189.99 },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

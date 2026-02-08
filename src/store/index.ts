@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Product, CartItem, User } from '@/types';
 
+// Generate unique ID that works in both browser and server
+const generateId = (): string => {
+  if (typeof window !== 'undefined' && 'crypto' in window && 'randomUUID' in window.crypto) {
+    return window.crypto.randomUUID();
+  }
+  // Fallback for server-side or older browsers
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
 interface CartStore {
   items: CartItem[];
   addItem: (product: Product, size: string, color: string, quantity: number, userId: string) => void;
@@ -53,7 +62,7 @@ export const useCartStore = create<CartStore>()(
           });
         } else {
           const newItem: CartItem = {
-            id: crypto.randomUUID(),
+            id: generateId(),
             product_id: product.id,
             product,
             user_id: userId,

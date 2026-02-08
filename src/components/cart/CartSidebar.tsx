@@ -16,7 +16,7 @@ interface CartSidebarProps {
 
 const CartSidebar = ({ isOpen, onClose }: CartSidebarProps) => {
   const router = useRouter();
-  const { items, removeItem, updateQuantity, getTotal } = useCartStore();
+  const { items, removeItem, updateQuantity, getTotal, clearCart } = useCartStore();
   const { user } = useAuthStore();
   const { toggleCart } = useUIStore();
 
@@ -90,24 +90,28 @@ const CartSidebar = ({ isOpen, onClose }: CartSidebarProps) => {
                       className="flex gap-4 p-3 bg-gray-50 rounded-lg"
                     >
                       <div className="relative w-20 h-24 bg-white rounded overflow-hidden">
-                        {item.product?.images[0] && (
+                        {item.product?.images?.[0] ? (
                           <Image
                             src={item.product.images[0]}
-                            alt={item.product.name}
+                            alt={item.product.name || 'Product'}
                             fill
                             className="object-cover"
                           />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                            <FiShoppingBag size={20} />
+                          </div>
                         )}
                       </div>
                       <div className="flex-1">
                         <h3 className="font-medium text-sm line-clamp-1">
-                          {item.product?.name}
+                          {item.product?.name || 'Product'}
                         </h3>
                         <p className="text-sm text-gray-500">
-                          {item.size} / {item.color}
+                          {item.size || 'One Size'} / {item.color || 'Default'}
                         </p>
                         <p className="font-semibold mt-1">
-                          ₹{item.product?.price.toLocaleString()}
+                          ₹{(item.product?.price || 0).toLocaleString()}
                         </p>
                         <div className="flex items-center justify-between mt-2">
                           <div className="flex items-center gap-2">

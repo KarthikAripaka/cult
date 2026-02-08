@@ -8,6 +8,7 @@ import { FiArrowRight, FiTruck, FiRefreshCw, FiShield, FiShoppingBag, FiTrending
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/product/ProductCard';
 import { Product, Category } from '@/types';
+import toast from 'react-hot-toast';
 
 // Hero Slides Data
 const heroSlides = [
@@ -412,13 +413,41 @@ export default function HomePage() {
             <p className="text-gray-400 mb-8">
               Subscribe to our newsletter for exclusive offers, new arrivals, and style inspiration.
             </p>
-            <form className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+                
+                try {
+                  const response = await fetch('/api/newsletter', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (data.success) {
+                    toast.success(data.message);
+                    form.reset();
+                  } else {
+                    toast.error(data.error || 'Failed to subscribe');
+                  }
+                } catch {
+                  toast.error('An error occurred. Please try again.');
+                }
+              }}
+              className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto"
+            >
               <input
                 type="email"
+                name="email"
                 placeholder="Enter your email"
+                required
                 className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-white transition-colors"
               />
-              <Button variant="accent">
+              <Button variant="accent" type="submit">
                 Subscribe
               </Button>
             </form>

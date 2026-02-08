@@ -1,30 +1,32 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { FiInstagram, FiTwitter, FiFacebook, FiYoutube, FiMail, FiPhone, FiMapPin } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 const footerLinks = {
   shop: [
-    { label: 'New Arrivals', href: '/shop' },
-    { label: 'Men', href: '/shop' },
-    { label: 'Women', href: '/shop' },
-    { label: 'Accessories', href: '/shop' },
-    { label: 'Sale', href: '/shop' },
+    { label: 'New Arrivals', href: '/shop?category=new-arrivals' },
+    { label: 'Men', href: '/shop?category=men' },
+    { label: 'Women', href: '/shop?category=women' },
+    { label: 'Accessories', href: '/shop?category=accessories' },
+    { label: 'Sale', href: '/shop?category=sale' },
   ],
   help: [
-    { label: 'Customer Service', href: '/shop' },
-    { label: 'Track Order', href: '/shop' },
-    { label: 'Returns & Exchanges', href: '/shop' },
-    { label: 'Shipping Info', href: '/shop' },
-    { label: 'Size Guide', href: '/shop' },
+    { label: 'Customer Service', href: '/help' },
+    { label: 'Track Order', href: '/orders' },
+    { label: 'Returns & Exchanges', href: '/help#returns' },
+    { label: 'Shipping Info', href: '/help#shipping' },
+    { label: 'Size Guide', href: '/size-guide' },
   ],
   company: [
-    { label: 'About Us', href: '/shop' },
-    { label: 'Careers', href: '/shop' },
-    { label: 'Press', href: '/shop' },
-    { label: 'Sustainability', href: '/shop' },
-    { label: 'Contact', href: '/shop' },
+    { label: 'About Us', href: '/about' },
+    { label: 'Careers', href: '/about#careers' },
+    { label: 'Press', href: '/about#press' },
+    { label: 'Sustainability', href: '/about#sustainability' },
+    { label: 'Contact', href: '/contact' },
   ],
 };
 
@@ -48,15 +50,44 @@ const Footer = () => {
                 Subscribe to get special offers, free giveaways, and once-in-a-lifetime deals.
               </p>
             </div>
-            <form className="flex w-full md:w-auto gap-2">
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+                
+                try {
+                  const response = await fetch('/api/newsletter', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (data.success) {
+                    toast.success(data.message);
+                    form.reset();
+                  } else {
+                    toast.error(data.error || 'Failed to subscribe');
+                  }
+                } catch {
+                  toast.error('An error occurred. Please try again.');
+                }
+              }}
+              className="flex w-full md:w-auto gap-2"
+            >
               <input
                 type="email"
+                name="email"
                 placeholder="Enter your email"
+                required
                 className="flex-1 md:w-64 px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-white transition-colors"
               />
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                type="submit"
                 className="px-6 py-3 bg-white text-black font-medium rounded-lg hover:bg-gray-100 transition-colors"
               >
                 Subscribe
@@ -158,13 +189,13 @@ const Footer = () => {
               © {new Date().getFullYear()} CULT. All rights reserved.
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-400">
-              <Link href="/shop" className="hover:text-white transition-colors">
+              <Link href="/privacy" className="hover:text-white transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/shop" className="hover:text-white transition-colors">
+              <Link href="/terms" className="hover:text-white transition-colors">
                 Terms of Service
               </Link>
-              <Link href="/shop" className="hover:text-white transition-colors">
+              <Link href="/cookies" className="hover:text-white transition-colors">
                 Cookies
               </Link>
             </div>

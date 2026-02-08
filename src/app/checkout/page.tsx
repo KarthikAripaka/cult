@@ -308,10 +308,10 @@ export default function CheckoutPage() {
                 {items.map((item) => (
                   <div key={item.id} className="flex gap-3">
                     <div className="relative w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                      {item.product?.images[0] && (
+                      {item.product?.images?.[0] && (
                         <Image
                           src={item.product.images[0]}
-                          alt={item.product.name}
+                          alt={item.product?.name || 'Product'}
                           fill
                           className="object-cover"
                         />

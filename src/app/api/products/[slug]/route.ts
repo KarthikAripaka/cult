@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { sampleProducts } from '@/data/products';
+import { Product, products, getRecommendedProducts } from '@/data/products';
 
-// Get single product by slug
+// Get single product by slug with recommended products
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }
@@ -11,39 +11,49 @@ export async function GET(
   const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && 
                                 process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://your-project.supabase.co';
   
-  // Use mock data if Supabase is not configured
+  const slug = params?.slug;
+
+  // Use demo data if Supabase is not configured
   if (!isSupabaseConfigured) {
-    const product = sampleProducts.find(p => p.slug === params.slug);
+    // Find product by slug (handle both slug formats)
+    let product = products.find(p => p.slug === slug);
+    
+    // Also try matching the old format (replace-hyphens-with-spaces)
+    if (!product) {
+      const slugWithoutHyphens = slug?.replace(/-/g, ' ');
+      product = products.find(p => 
+        p.name.toLowerCase().replace(/\s+/g, '-') === slug || 
+        p.name.toLowerCase().replace(/\s+/g, '-') === slugWithoutHyphens
+      );
+    }
     
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
     
-    // Get related products (same category, excluding current)
-    const relatedProducts = sampleProducts
-      .filter(p => p.category_id === product.category_id && p.id !== product.id)
-      .slice(0, 4);
+    // Get recommended products (same category + different category for variety)
+    const recommendedProducts = getRecommendedProducts(product.id, 8);
     
     // Get reviews (mock data for demo)
     const reviews = [
       {
         id: '1',
         user: { name: 'John D.', avatar: null },
-        rating: 5,
+        rating: product.rating,
         comment: 'Excellent quality! Perfect fit and amazing fabric.',
         created_at: new Date().toISOString()
       },
       {
         id: '2',
         user: { name: 'Sarah M.', avatar: null },
-        rating: 4,
+        rating: product.rating - 0.5,
         comment: 'Great product, exactly as shown in the pictures.',
         created_at: new Date(Date.now() - 86400000 * 3).toISOString()
       },
       {
         id: '3',
         user: { name: 'Mike R.', avatar: null },
-        rating: 5,
+        rating: product.rating + 0.5,
         comment: 'Fast shipping and the product exceeded my expectations!',
         created_at: new Date(Date.now() - 86400000 * 7).toISOString()
       }
@@ -51,10 +61,11 @@ export async function GET(
     
     return NextResponse.json({
       product,
-      relatedProducts,
+      recommendedProducts,
+      relatedProducts: recommendedProducts.slice(0, 4), // For backward compatibility
       reviews,
-      averageRating: 4.7,
-      totalReviews: 127
+      averageRating: product.rating,
+      totalReviews: product.reviewCount
     });
   }
   
@@ -71,14 +82,35 @@ export async function GET(
           slug
         )
       `)
-      .eq('slug', params.slug)
+      .eq('slug', slug)
       .single();
     
     if (error || !product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
     
-    // Get related products (same category, excluding current)
+    // Get recommended products from same category and different categories
+    const { data: sameCategory } = await supabase
+      .from('products')
+      .select('*')
+      .eq('category_id', product.category_id)
+      .neq('id', product.id)
+      .limit(5);
+    
+    const { data: differentCategory } = await supabase
+      .from('products')
+      .select('*')
+      .neq('category_id', product.category_id)
+      .neq('id', product.id)
+      .limit(3)
+      .order('avg_rating', { ascending: false });
+    
+    // Combine and shuffle for recommendations
+    const recommendedProducts = [...(sameCategory || []), ...(differentCategory || [])]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 8);
+    
+    // Get related products (same category only)
     const { data: relatedProducts } = await supabase
       .from('products')
       .select('*')
@@ -111,6 +143,7 @@ export async function GET(
     
     return NextResponse.json({
       product,
+      recommendedProducts,
       relatedProducts: relatedProducts || [],
       reviews: reviews || [],
       averageRating,

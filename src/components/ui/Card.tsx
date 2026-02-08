@@ -1,42 +1,57 @@
 'use client';
 
-import { motion, HTMLMotionProps } from 'framer-motion';
+import { HTMLAttributes, forwardRef } from 'react';
 import clsx from 'clsx';
 
-interface CardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
-  children: React.ReactNode;
-  variant?: 'default' | 'elevated' | 'outlined';
-  hoverEffect?: boolean;
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  variant?: 'default' | 'bordered' | 'elevated';
+  padding?: 'none' | 'sm' | 'md' | 'lg';
+  hover?: boolean;
 }
 
-const Card = ({
-  children,
-  variant = 'default',
-  hoverEffect = false,
-  className,
-  ...props
-}: CardProps) => {
-  const variants = {
-    default: 'bg-white border border-gray-100',
-    elevated: 'bg-white shadow-lg',
-    outlined: 'bg-white border-2 border-gray-200',
-  };
+const Card = forwardRef<HTMLDivElement, CardProps>(
+  (
+    {
+      children,
+      className,
+      variant = 'default',
+      padding = 'md',
+      hover = false,
+      ...props
+    },
+    ref
+  ) => {
+    const variants = {
+      default: 'bg-white shadow-sm',
+      bordered: 'bg-white border border-gray-200',
+      elevated: 'bg-white shadow-lg',
+    };
 
-  return (
-    <motion.div
-      className={clsx(
-        variants[variant],
-        hoverEffect && 'hover:shadow-xl hover:-translate-y-1 transition-all duration-300',
-        className
-      )}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      {...props}
-    >
-      {children}
-    </motion.div>
-  );
-};
+    const paddings = {
+      none: '',
+      sm: 'p-3',
+      md: 'p-4 md:p-6',
+      lg: 'p-6 md:p-8',
+    };
+
+    return (
+      <div
+        ref={ref}
+        className={clsx(
+          'rounded-xl',
+          variants[variant],
+          paddings[padding],
+          hover && 'transition-shadow duration-300 hover:shadow-md',
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+
+Card.displayName = 'Card';
 
 export default Card;
