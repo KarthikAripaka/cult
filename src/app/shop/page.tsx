@@ -204,7 +204,46 @@ function ShopContent() {
         </div>
       </section>
       
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      {/* Category Images Section */}
+      {selectedCategory === 'all' && (
+        <section className="max-w-7xl mx-auto px-4 py-8">
+          <h2 className="text-2xl font-bold mb-6">Shop by Category</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {categories.map((category) => (
+              <motion.div
+                key={category.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -5 }}
+                className="relative group cursor-pointer rounded-xl overflow-hidden"
+                onClick={() => { setSelectedCategory(category.slug); setCurrentPage(1); }}
+              >
+                <div className="aspect-square relative">
+                  {category.image_url ? (
+                    <Image
+                      src={category.image_url}
+                      alt={category.name}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                      <span className="text-4xl">👕</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <h3 className="text-white font-bold text-lg">{category.name}</h3>
+                    <p className="text-white/80 text-xs">{category.description}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
+      
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           {/* Mobile Filter Button */}
