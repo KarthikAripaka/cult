@@ -156,28 +156,51 @@ function ShopContent() {
     const category = categories.find(c => c.slug === selectedCategory);
     return category?.name || selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1);
   };
-  
+
+  // Get category image for banner
+  const getCategoryImage = () => {
+    if (selectedCategory === 'all' || selectedCategory === 'new-arrivals') {
+      return 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200';
+    }
+    const category = categories.find(c => c.slug === selectedCategory);
+    return category?.image_url || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pt-24">
-      {/* Page Header */}
-      <section className="bg-black text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <motion.h1 
+      {/* Page Header with Category Image */}
+      <section 
+        className="relative h-64 md:h-80 bg-black overflow-hidden"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url(${getCategoryImage()})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
+        <div className="relative max-w-7xl mx-auto px-4 h-full flex items-center">
+          <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-5xl font-bold mb-4"
+            className="text-white"
           >
-            {getPageTitle()}
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-gray-400 max-w-2xl mx-auto"
-          >
-            Discover our curated collection of premium fashion pieces. 
-            {totalProducts > 0 && ` Showing ${totalProducts} products`}
-          </motion.p>
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-4xl md:text-5xl font-bold mb-4"
+            >
+              {getPageTitle()}
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-gray-200 max-w-2xl"
+            >
+              Discover our curated collection of premium fashion pieces. 
+              {totalProducts > 0 && ` Showing ${totalProducts} products`}
+            </motion.p>
+          </motion.div>
         </div>
       </section>
       

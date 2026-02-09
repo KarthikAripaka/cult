@@ -12,6 +12,19 @@ const getSupabaseClient = () => {
   return createClient(supabaseUrl, supabaseAnonKey);
 };
 
+// Check if Supabase is properly configured
+const isSupabaseConfigured = () => {
+  return !!(supabaseUrl && supabaseAnonKey && 
+    supabaseUrl !== 'https://your-project.supabase.co' &&
+    supabaseAnonKey !== 'your-anon-key');
+};
+
+// Validate UUID format
+const isValidUUID = (id: string) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
 // GET orders for logged-in user
 export async function GET(request: NextRequest) {
   try {
@@ -25,8 +38,8 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseClient();
 
-    // Return empty orders if Supabase is not configured or no user
-    if (!supabase || !userId) {
+    // Return empty orders if Supabase is not configured, no user, or invalid userId
+    if (!isSupabaseConfigured() || !userId || !isValidUUID(userId)) {
       return NextResponse.json({
         orders: [],
         pagination: {
