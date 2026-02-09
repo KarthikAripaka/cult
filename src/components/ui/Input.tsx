@@ -3,60 +3,65 @@
 import { InputHTMLAttributes, forwardRef } from 'react';
 import clsx from 'clsx';
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
   error?: string;
-  helperText?: string;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
+  fullWidth?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, leftIcon, rightIcon, className, id, ...props }, ref) => {
-    const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+  (
+    {
+      label,
+      error,
+      fullWidth = true,
+      size = 'md',
+      className,
+      ...props
+    },
+    ref
+  ) => {
+    const baseStyles = `
+      w-full px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent
+      transition-all duration-200 ease-out
+      disabled:bg-gray-100 disabled:cursor-not-allowed
+    `;
+
+    const sizes = {
+      sm: 'py-2 text-sm',
+      md: 'py-3 text-base',
+      lg: 'py-4 text-lg',
+    };
+
+    const labelStyles = `
+      block text-sm font-medium text-gray-700 mb-1
+    `;
+
+    const errorStyles = `
+      border-red-500 focus:ring-red-500
+    `;
 
     return (
-      <div className="w-full">
+      <div className={clsx(fullWidth && 'w-full')}>
         {label && (
-          <label
-            htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label className={labelStyles}>
             {label}
+            {props.required && <span className="text-red-500 ml-1">*</span>}
           </label>
         )}
-        <div className="relative">
-          {leftIcon && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-              {leftIcon}
-            </div>
+        <input
+          ref={ref}
+          className={clsx(
+            baseStyles,
+            sizes[size],
+            error && errorStyles,
+            className
           )}
-          <input
-            ref={ref}
-            id={inputId}
-            className={clsx(
-              'w-full px-4 py-3 bg-white border transition-all duration-300',
-              'focus:outline-none focus:ring-2 focus:ring-offset-0',
-              error
-                ? 'border-red-500 focus:border-red-500 focus:ring-red-200'
-                : 'border-gray-300 focus:border-black focus:ring-gray-200',
-              leftIcon && 'pl-10',
-              rightIcon && 'pr-10',
-              className
-            )}
-            {...props}
-          />
-          {rightIcon && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
-              {rightIcon}
-            </div>
-          )}
-        </div>
+          {...props}
+        />
         {error && (
-          <p className="mt-1 text-sm text-red-500 animate-fade-in">{error}</p>
-        )}
-        {helperText && !error && (
-          <p className="mt-1 text-sm text-gray-500">{helperText}</p>
+          <p className="mt-1 text-sm text-red-500">{error}</p>
         )}
       </div>
     );

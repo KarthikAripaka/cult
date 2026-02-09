@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FcGoogle } from 'react-icons/fc';
 import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
 import { useAuthStore } from '@/store';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +16,75 @@ export default function LoginPage() {
   const { setUser, setLoading: setStoreLoading } = useAuthStore();
   
   const [loading, setLocalLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Email/Password Login
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
+      toast.error('Please enter email and password');
+      return;
+    }
+
+    setLocalLoading(true);
+    setStoreLoading(true);
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        setStoreLoading(false);
+        setLocalLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Fetch user profile from users table
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile) {
+          setUser(profile);
+        } else {
+          // Create profile if doesn't exist
+          const { data: newProfile } = await supabase
+            .from('users')
+            .insert({
+              id: data.user.id,
+              email: data.user.email,
+              name: data.user.user_metadata?.name || email.split('@')[0],
+              is_admin: false,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+          
+          if (newProfile) {
+            setUser(newProfile);
+          }
+        }
+        
+        toast.success('Welcome back!');
+        router.push('/');
+      }
+    } catch (error) {
+      toast.error('An error occurred. Please try again.');
+      setStoreLoading(false);
+      setLocalLoading(false);
+    }
+  };
 
   // Google Sign In
   const handleGoogleSignIn = async () => {
@@ -36,6 +106,7 @@ export default function LoginPage() {
       if (error) {
         toast.error(error.message);
         setStoreLoading(false);
+        setLocalLoading(false);
       }
       // Redirect will happen automatically by Supabase
     } catch (error) {
@@ -91,15 +162,49 @@ export default function LoginPage() {
             <p className="text-gray-600">Sign in to your account</p>
           </div>
 
-          {/* Demo Login Button */}
-          <Button
-            variant="outline"
-            className="w-full mb-6"
-            onClick={handleDemoLogin}
-            disabled={loading}
-          >
-            Continue as Demo User
-          </Button>
+          {/* Email/Password Form */}
+          <form onSubmit={handleEmailLogin} className="space-y-4 mb-6">
+            <Input
+              type="email"
+              label="Email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-[38px] text-gray-500 hover:text-black text-sm"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            
+            <Button
+              type="submit"
+              className="w-full"
+              isLoading={loading}
+            >
+              Sign In
+            </Button>
+          </form>
+
+          {/* Forgot Password Link */}
+          <div className="text-right mb-4">
+            <Link href="/auth/forgot-password" className="text-sm text-orange-500 hover:underline">
+              Forgot Password?
+            </Link>
+          </div>
 
           {/* Divider */}
           <div className="flex items-center gap-4 mb-6">
@@ -108,23 +213,26 @@ export default function LoginPage() {
             <div className="flex-1 border-t border-gray-200" />
           </div>
 
+          {/* Demo Login Button */}
+          <Button
+            variant="outline"
+            className="w-full mb-4"
+            onClick={handleDemoLogin}
+            disabled={loading}
+          >
+            Continue as Demo User
+          </Button>
+
           {/* Google Sign In */}
           <Button
             variant="outline"
-            className="w-full mb-4 flex items-center justify-center gap-3"
+            className="w-full flex items-center justify-center gap-3"
             onClick={handleGoogleSignIn}
             disabled={loading}
           >
             <FcGoogle size={22} />
             Continue with Google
           </Button>
-
-          {/* Info Box */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600 text-center">
-              We only support <span className="font-semibold">Google Sign-In</span> for secure and easy access to your account.
-            </p>
-          </div>
 
           {/* Register Link */}
           <p className="text-center text-gray-600 mt-6">

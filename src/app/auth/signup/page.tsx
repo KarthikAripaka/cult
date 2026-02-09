@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FcGoogle } from 'react-icons/fc';
 import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
 import { useAuthStore } from '@/store';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +16,85 @@ export default function SignupPage() {
   const { setUser, setLoading: setStoreLoading } = useAuthStore();
   
   const [loading, setLocalLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Email/Password Signup
+  const handleEmailSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password || !name) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+
+    setLocalLoading(true);
+    setStoreLoading(true);
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
+        },
+      });
+
+      if (error) {
+        toast.error(error.message);
+        setStoreLoading(false);
+        setLocalLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Create profile
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            name: name,
+            is_admin: false,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+        
+        if (profile) {
+          setUser(profile);
+        }
+        
+        toast.success('Welcome to CULT!');
+        router.push('/');
+      }
+    } catch (error) {
+      toast.error('An error occurred. Please try again.');
+      setStoreLoading(false);
+      setLocalLoading(false);
+    }
+  };
 
   // Google Sign Up
   const handleGoogleSignUp = async () => {
@@ -36,6 +116,7 @@ export default function SignupPage() {
       if (error) {
         toast.error(error.message);
         setStoreLoading(false);
+        setLocalLoading(false);
       }
       // Redirect will happen automatically by Supabase
     } catch (error) {
@@ -91,15 +172,66 @@ export default function SignupPage() {
             <p className="text-gray-600">Join the Cult community</p>
           </div>
 
-          {/* Demo Signup Button */}
-          <Button
-            variant="outline"
-            className="w-full mb-6"
-            onClick={handleDemoSignup}
-            disabled={loading}
-          >
-            Try Demo Mode
-          </Button>
+          {/* Email/Password Form */}
+          <form onSubmit={handleEmailSignup} className="space-y-4 mb-6">
+            <Input
+              type="text"
+              label="Full Name"
+              placeholder="John Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <Input
+              type="email"
+              label="Email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                label="Password"
+                placeholder="Create password (min. 8 characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-[38px] text-gray-500 hover:text-black text-sm"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              label="Confirm Password"
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+            
+            <Button
+              type="submit"
+              className="w-full"
+              isLoading={loading}
+            >
+              Create Account
+            </Button>
+          </form>
+
+          {/* Terms */}
+          <p className="text-xs text-gray-500 text-center mb-6">
+            By creating an account, you agree to our{' '}
+            <Link href="/terms" className="text-orange-500 hover:underline">Terms of Service</Link>
+            {' '}and{' '}
+            <Link href="/privacy" className="text-orange-500 hover:underline">Privacy Policy</Link>
+          </p>
 
           {/* Divider */}
           <div className="flex items-center gap-4 mb-6">
@@ -108,23 +240,26 @@ export default function SignupPage() {
             <div className="flex-1 border-t border-gray-200" />
           </div>
 
+          {/* Demo Signup Button */}
+          <Button
+            variant="outline"
+            className="w-full mb-4"
+            onClick={handleDemoSignup}
+            disabled={loading}
+          >
+            Try Demo Mode
+          </Button>
+
           {/* Google Sign Up */}
           <Button
             variant="outline"
-            className="w-full mb-4 flex items-center justify-center gap-3"
+            className="w-full flex items-center justify-center gap-3"
             onClick={handleGoogleSignUp}
             disabled={loading}
           >
             <FcGoogle size={22} />
             Sign up with Google
           </Button>
-
-          {/* Info Box */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600 text-center">
-              Create your account with <span className="font-semibold">Google</span> for quick and secure access.
-            </p>
-          </div>
 
           {/* Login Link */}
           <p className="text-center text-gray-600 mt-6">

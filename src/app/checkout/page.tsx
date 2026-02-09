@@ -69,14 +69,14 @@ export default function CheckoutPage() {
     setLoading(true);
     
     try {
-      const response = await fetch('/api/cart', {
+      const response = await fetch('/api/cart/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: user?.id || 'guest',
+          userId: user?.id || 'guest',
           items: items,
-          shipping_address: shippingAddress,
-          payment_method: paymentMethod,
+          shippingAddress,
+          paymentMethod,
         }),
       });
       
@@ -84,8 +84,15 @@ export default function CheckoutPage() {
       
       if (data.success) {
         clearCart();
-        toast.success('Order placed successfully!');
-        router.push(`/orders?id=${data.order.id}`);
+        toast.success(data.message || 'Order placed successfully!');
+        // Navigate to orders page with order number
+        const orderId = data.order?.id || data.orderId;
+        const orderNumber = data.order?.order_number || data.orderNumber;
+        if (orderNumber) {
+          router.push(`/orders?orderNumber=${orderNumber}`);
+        } else {
+          router.push('/orders');
+        }
       } else {
         toast.error(data.error || 'Failed to place order');
       }

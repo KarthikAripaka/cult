@@ -4,7 +4,7 @@ import { HTMLAttributes, forwardRef } from 'react';
 import clsx from 'clsx';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'bordered' | 'elevated';
+  variant?: 'default' | 'outlined' | 'elevated';
   padding?: 'none' | 'sm' | 'md' | 'lg';
   hover?: boolean;
 }
@@ -13,25 +13,25 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
   (
     {
       children,
-      className,
       variant = 'default',
       padding = 'md',
       hover = false,
+      className,
       ...props
     },
     ref
   ) => {
     const variants = {
-      default: 'bg-white shadow-sm',
-      bordered: 'bg-white border border-gray-200',
+      default: 'bg-white',
+      outlined: 'bg-white border border-gray-200',
       elevated: 'bg-white shadow-lg',
     };
 
     const paddings = {
       none: '',
-      sm: 'p-3',
-      md: 'p-4 md:p-6',
-      lg: 'p-6 md:p-8',
+      sm: 'p-4',
+      md: 'p-6',
+      lg: 'p-8',
     };
 
     return (
@@ -41,7 +41,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
           'rounded-xl',
           variants[variant],
           paddings[padding],
-          hover && 'transition-shadow duration-300 hover:shadow-md',
+          hover && 'transition-shadow duration-300 hover:shadow-lg',
           className
         )}
         {...props}

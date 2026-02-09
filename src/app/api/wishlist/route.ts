@@ -1,10 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const getSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
+
+// Demo wishlist items
+const demoWishlistItems = [
+  {
+    id: 'demo-1',
+    product_id: '1',
+    name: 'Classic White Oxford Shirt',
+    slug: 'classic-white-oxford-shirt',
+    price: 1499,
+    original_price: 1999,
+    image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400',
+    stock: 50,
+    added_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-2',
+    product_id: '3',
+    name: 'Oversized Hoodie',
+    slug: 'oversized-hoodie',
+    price: 2499,
+    original_price: 2999,
+    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400',
+    stock: 42,
+    added_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: 'demo-3',
+    product_id: '4',
+    name: 'Baggy Cargo Pants',
+    slug: 'baggy-cargo-pants',
+    price: 1899,
+    original_price: null,
+    image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400',
+    stock: 28,
+    added_at: new Date(Date.now() - 172800000).toISOString(),
+  },
+];
 
 // GET wishlist
 export async function GET(request: NextRequest) {
@@ -12,11 +54,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
+    // Demo mode if no userId or Supabase not configured
+    const supabase = getSupabaseClient();
+    if (!userId || !supabase) {
+      return NextResponse.json({ items: demoWishlistItems });
     }
 
     const { data: wishlistItems, error } = await supabase
@@ -83,6 +124,16 @@ export async function POST(request: NextRequest) {
         { error: 'User ID and Product ID are required' },
         { status: 400 }
       );
+    }
+
+    const supabase = getSupabaseClient();
+    
+    // Demo mode
+    if (!supabase) {
+      return NextResponse.json({
+        success: true,
+        message: 'Added to wishlist (demo mode)',
+      });
     }
 
     // Check if product exists
@@ -158,6 +209,16 @@ export async function DELETE(request: NextRequest) {
         { error: 'User ID is required' },
         { status: 400 }
       );
+    }
+
+    const supabase = getSupabaseClient();
+    
+    // Demo mode
+    if (!supabase) {
+      return NextResponse.json({
+        success: true,
+        message: 'Removed from wishlist (demo mode)',
+      });
     }
 
     if (wishlistId) {

@@ -90,6 +90,26 @@ export interface Order {
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
   created_at: string;
   updated_at: string;
+  // For display purposes
+  items?: OrderItemWithProduct[];
+  status_history?: { status: string; description: string; created_at: string }[];
+}
+
+export interface OrderItemWithProduct {
+  id?: string;
+  order_id?: string;
+  product_id?: string;
+  variant_id?: string;
+  quantity?: number;
+  price?: number;
+  size?: string;
+  color?: string;
+  product?: {
+    id?: string;
+    name?: string;
+    images?: string[];
+    slug?: string;
+  };
 }
 
 export interface OrderItem {

@@ -1,16 +1,6 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
-import { Toaster } from 'react-hot-toast';
-
-const inter = Inter({ 
-  subsets: ['latin'], 
-  variable: '--font-inter',
-  display: 'swap',
-  fallback: ['system-ui', 'sans-serif']
-});
+import AppLayout from '@/components/layout/AppLayout';
 
 export const metadata: Metadata = {
   title: {
@@ -75,34 +65,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en">
       <body className="font-sans antialiased">
-        <Header />
-        <main className="min-h-screen">{children}</main>
-        <Footer />
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#1a1a1a',
-              color: '#fff',
-              borderRadius: '8px',
-            },
-            success: {
-              iconTheme: {
-                primary: '#22c55e',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   );

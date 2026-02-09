@@ -3,23 +3,18 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import Link from 'next/link';
 import { 
   FiPackage, FiUsers, FiDollarSign, FiTrendingUp, 
   FiTrendingDown, FiPlus, FiSearch, FiEdit, 
   FiTrash2, FiX, FiGrid,
-  FiHome, FiBox, FiShoppingCart, FiBarChart2, FiSettings
+  FiHome, FiBox, FiShoppingCart, FiBarChart2, FiSettings,
+  FiAlertCircle, FiLoader
 } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
 import { Product, Category } from '@/types';
 import toast from 'react-hot-toast';
-
-// Stats
-const stats = [
-  { label: 'Total Revenue', value: '₹12,45,678', change: '+12.5%', trend: 'up', icon: FiDollarSign },
-  { label: 'Total Orders', value: '1,234', change: '+8.2%', trend: 'up', icon: FiPackage },
-  { label: 'Customers', value: '5,678', change: '+15.3%', trend: 'up', icon: FiUsers },
-  { label: 'Products', value: '0', change: '+0%', trend: 'up', icon: FiBox },
-];
+import { useAuthStore } from '@/store';
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   delivered: { bg: 'bg-green-100', text: 'text-green-800' },
@@ -29,63 +24,39 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   cancelled: { bg: 'bg-red-100', text: 'text-red-800' },
 };
 
-// Demo products for when database is unavailable
-const fallbackProducts: Product[] = [
-  {
-    id: '1', name: 'Classic White Oxford Shirt', slug: 'classic-white-oxford-shirt',
-    description: 'Timeless white oxford shirt', price: 1499, original_price: 1999,
-    images: ['https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=200'],
-    category: 'Shirts', stock: 50, is_featured: true, is_new: false,
-    rating: 4.5, review_count: 128, created_at: '2024-01-15',
-  },
-  {
-    id: '2', name: 'Navy Blue Casual Shirt', slug: 'navy-blue-casual-shirt',
-    description: 'Casual navy blue shirt', price: 1299,
-    images: ['https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=200'],
-    category: 'Shirts', stock: 35, is_featured: true, is_new: true,
-    rating: 4.7, review_count: 89, created_at: '2024-02-01',
-  },
-  {
-    id: '3', name: 'Oversized Hoodie', slug: 'oversized-hoodie',
-    description: 'Comfortable oversized hoodie', price: 2499, original_price: 2999,
-    images: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200'],
-    category: 'Hoodies', stock: 42, is_featured: true, is_new: true,
-    rating: 4.6, review_count: 234, created_at: '2024-02-05',
-  },
-  {
-    id: '4', name: 'Baggy Cargo Pants', slug: 'baggy-cargo-pants',
-    description: 'Relaxed fit cargo pants', price: 1899,
-    images: ['https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=200'],
-    category: 'Pants', stock: 28, is_featured: false, is_new: true,
-    rating: 4.4, review_count: 67, created_at: '2024-02-10',
-  },
-];
-
-const fallbackCategories: Category[] = [
-  { id: '1', name: 'Shirts', slug: 'shirts', image_url: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400', description: 'Premium casual and formal shirts' },
-  { id: '2', name: 'Hoodies', slug: 'hoodies', image_url: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400', description: 'Comfortable and stylish hoodies' },
-  { id: '3', name: 'Pants', slug: 'pants', image_url: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400', description: 'Jeans, joggers, and trousers' },
-  { id: '4', name: 'Baggies', slug: 'baggies', image_url: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400', description: 'Relaxed fit baggy pants' },
-  { id: '5', name: 'Torn Jeans', slug: 'torn-jeans', image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=400', description: 'Distressed and ripped denim' },
-];
+interface DashboardStats {
+  totalRevenue: number;
+  totalOrders: number;
+  totalCustomers: number;
+  totalProducts: number;
+}
 
 export default function AdminPage() {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalCustomers: 0,
+    totalProducts: 0,
+  });
 
   const [productForm, setProductForm] = useState({
     name: '', description: '', price: '', original_price: '', category: '', stock: '', is_featured: false, is_new: false, images: [''],
   });
 
   const [categoryForm, setCategoryForm] = useState({
-    name: '', slug: '', description: '', image_url: '',
+    name: '', slug: '', description: '', image_url: '', sort_order: 0, is_active: true,
   });
+
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
 
   const menuItems = [
     { id: 'overview', icon: FiHome, label: 'Overview' },
@@ -104,19 +75,15 @@ export default function AdminPage() {
         const response = await fetch('/api/products?limit=100');
         const data = await response.json();
         
-        if (data.products && data.products.length > 0) {
+        if (data.error) {
+          setError(data.error);
+        } else if (data.products) {
           setProducts(data.products);
-          // Update stats with real count
-          stats[3].value = data.products.length.toString();
-        } else {
-          setProducts(fallbackProducts);
+          setStats(prev => ({ ...prev, totalProducts: data.products.length }));
         }
       } catch (err) {
         console.error('Error fetching products:', err);
-        setProducts(fallbackProducts);
-        setError('Using demo data - database connection failed');
-      } finally {
-        setLoading(false);
+        setError('Failed to fetch products');
       }
     };
 
@@ -130,11 +97,16 @@ export default function AdminPage() {
         const response = await fetch('/api/categories');
         const data = await response.json();
         
-        if (data.categories && data.categories.length > 0) {
+        if (data.error) {
+          setError(data.error);
+        } else if (data.categories) {
           setCategories(data.categories);
         }
       } catch (err) {
         console.error('Error fetching categories:', err);
+        setError('Failed to fetch categories');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -176,40 +148,17 @@ export default function AdminPage() {
         // Refresh products
         const refreshResponse = await fetch('/api/products?limit=100');
         const refreshData = await refreshResponse.json();
-        setProducts(refreshData.products || fallbackProducts);
+        if (refreshData.products) {
+          setProducts(refreshData.products);
+          setStats(prev => ({ ...prev, totalProducts: refreshData.products.length }));
+        }
       } else {
-        // Add locally for demo
-        const localProduct: Product = {
-          id: Date.now().toString(),
-          ...newProduct,
-          slug: productForm.name.toLowerCase().replace(/\s+/g, '-'),
-          rating: 0,
-          review_count: 0,
-          created_at: new Date().toISOString(),
-        };
-        setProducts([localProduct, ...products]);
-        toast.success('Product added (demo mode)');
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to add product');
       }
     } catch (err) {
-      // Add locally for demo
-      const localProduct: Product = {
-        id: Date.now().toString(),
-        name: productForm.name,
-        description: productForm.description,
-        price: parseFloat(productForm.price),
-        original_price: productForm.original_price ? parseFloat(productForm.original_price) : undefined,
-        category: productForm.category,
-        stock: parseInt(productForm.stock) || 0,
-        is_featured: productForm.is_featured,
-        is_new: productForm.is_new,
-        images: productForm.images.filter(Boolean),
-        slug: productForm.name.toLowerCase().replace(/\s+/g, '-'),
-        rating: 0,
-        review_count: 0,
-        created_at: new Date().toISOString(),
-      };
-      setProducts([localProduct, ...products]);
-      toast.success('Product added (demo mode)');
+      console.error('Error adding product:', err);
+      toast.error('Failed to add product');
     }
 
     setShowAddProduct(false);
@@ -226,14 +175,15 @@ export default function AdminPage() {
 
       if (response.ok) {
         setProducts(products.filter(p => p.id !== id));
+        setStats(prev => ({ ...prev, totalProducts: prev.totalProducts - 1 }));
         toast.success('Product deleted successfully');
       } else {
-        setProducts(products.filter(p => p.id !== id));
-        toast.success('Product deleted (demo mode)');
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to delete product');
       }
     } catch (err) {
-      setProducts(products.filter(p => p.id !== id));
-      toast.success('Product deleted (demo mode)');
+      console.error('Error deleting product:', err);
+      toast.error('Failed to delete product');
     }
   };
 
@@ -243,34 +193,116 @@ export default function AdminPage() {
       return;
     }
 
-    const newCategory: Category = {
-      id: Date.now().toString(),
-      name: categoryForm.name,
-      slug: categoryForm.slug,
-      description: categoryForm.description,
-      image_url: categoryForm.image_url,
-    };
+    try {
+      let response;
+      
+      if (editingCategory) {
+        // Update existing category
+        response = await fetch('/api/admin/categories', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ categoryId: editingCategory, ...categoryForm }),
+        });
+      } else {
+        // Create new category
+        response = await fetch('/api/admin/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(categoryForm),
+        });
+      }
 
-    setCategories([...categories, newCategory]);
-    toast.success('Category added (demo mode)');
+      if (response.ok) {
+        toast.success(editingCategory ? 'Category updated successfully' : 'Category added successfully');
+        // Refresh categories
+        const refreshResponse = await fetch('/api/categories');
+        const refreshData = await refreshResponse.json();
+        if (refreshData.categories) {
+          setCategories(refreshData.categories);
+        }
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to save category');
+      }
+    } catch (err) {
+      console.error('Error saving category:', err);
+      toast.error('Failed to save category');
+    }
+
     setShowAddCategory(false);
-    setCategoryForm({ name: '', slug: '', description: '', image_url: '' });
+    setEditingCategory(null);
+    setCategoryForm({ name: '', slug: '', description: '', image_url: '', sort_order: 0, is_active: true });
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category.id);
+    setCategoryForm({
+      name: category.name,
+      slug: category.slug,
+      description: category.description || '',
+      image_url: category.image_url || '',
+      sort_order: category.sort_order || 0,
+      is_active: category.is_active ?? true,
+    });
+    setShowAddCategory(true);
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+
+    try {
+      const response = await fetch(`/api/admin/categories?id=${categoryId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success('Category deleted successfully');
+        // Refresh categories
+        const refreshResponse = await fetch('/api/categories');
+        const refreshData = await refreshResponse.json();
+        if (refreshData.categories) {
+          setCategories(refreshData.categories);
+        }
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to delete category');
+      }
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      toast.error('Failed to delete category');
+    }
   };
 
   const generateSlug = (name: string) => {
     return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100 pt-16">
-      {/* Error Banner */}
-      {error && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800">
-          {error} - Changes will be saved locally until database connection is restored.
-        </div>
-      )}
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <FiLoader className="animate-spin text-2xl text-orange-500" />
+      </div>
+    );
+  }
 
-      <aside className="fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200 overflow-y-auto">
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <div className="max-w-7xl mx-auto px-4 py-16">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+            <FiAlertCircle className="mx-auto text-red-500 mb-4" size={48} />
+            <h2 className="text-xl font-bold text-red-800 mb-2">Error Loading Admin Dashboard</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
           <h2 className="text-xl font-bold mb-6 px-4">Admin Panel</h2>
           <nav className="space-y-1">
@@ -287,6 +319,17 @@ export default function AdminPage() {
               </button>
             ))}
           </nav>
+        </div>
+        
+        {/* Back to Store Button */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+          <Link 
+            href="/" 
+            className="flex items-center justify-center gap-2 w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium"
+          >
+            <FiHome size={18} />
+            Back to Store
+          </Link>
         </div>
       </aside>
 
@@ -308,21 +351,54 @@ export default function AdminPage() {
         {activeTab === 'overview' && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => (
-                <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="bg-white rounded-xl p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <stat.icon className="text-gray-600" size={24} />
-                    </div>
-                    <span className={`flex items-center gap-1 text-sm ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                      {stat.trend === 'up' ? <FiTrendingUp size={16} /> : <FiTrendingDown size={16} />}
-                      {stat.change}
-                    </span>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }} className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <FiDollarSign className="text-gray-600" size={24} />
                   </div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-sm text-gray-500">{stat.label}</p>
-                </motion.div>
-              ))}
+                  <span className="flex items-center gap-1 text-sm text-green-600">
+                    <FiTrendingUp size={16} />+12.5%
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">₹{stats.totalRevenue.toLocaleString() || '0'}</p>
+                <p className="text-sm text-gray-500">Total Revenue</p>
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <FiPackage className="text-gray-600" size={24} />
+                  </div>
+                  <span className="flex items-center gap-1 text-sm text-green-600">
+                    <FiTrendingUp size={16} />+8.2%
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">{stats.totalOrders || '0'}</p>
+                <p className="text-sm text-gray-500">Total Orders</p>
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <FiUsers className="text-gray-600" size={24} />
+                  </div>
+                  <span className="flex items-center gap-1 text-sm text-green-600">
+                    <FiTrendingUp size={16} />+15.3%
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">{stats.totalCustomers || '0'}</p>
+                <p className="text-sm text-gray-500">Customers</p>
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <FiBox className="text-gray-600" size={24} />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold">{stats.totalProducts}</p>
+                <p className="text-sm text-gray-500">Products</p>
+              </motion.div>
             </div>
 
             <div className="grid lg:grid-cols-2 gap-8">
@@ -331,36 +407,9 @@ export default function AdminPage() {
                   <h2 className="text-lg font-bold">Recent Orders</h2>
                   <button onClick={() => setActiveTab('orders')} className="text-sm text-orange-500 hover:underline">View All</button>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {[
-                        { id: 'ORD-001', customer: 'John Doe', total: 1899, status: 'delivered' },
-                        { id: 'ORD-002', customer: 'Sarah Smith', total: 2499, status: 'shipped' },
-                        { id: 'ORD-003', customer: 'Mike Johnson', total: 3299, status: 'processing' },
-                        { id: 'ORD-004', customer: 'Emily Davis', total: 899, status: 'pending' },
-                      ].map((order) => (
-                        <tr key={order.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-medium">{order.id}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{order.customer}</td>
-                          <td className="px-6 py-4">
-                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColors[order.status].bg} ${statusColors[order.status].text}`}>
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm font-medium">₹{order.total.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="p-6 text-center text-gray-500">
+                  <FiShoppingCart className="mx-auto mb-2" size={32} />
+                  <p>Orders will appear here</p>
                 </div>
               </motion.div>
 
@@ -370,7 +419,7 @@ export default function AdminPage() {
                   <button onClick={() => setActiveTab('products')} className="text-sm text-orange-500 hover:underline">Manage</button>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {filteredProducts.slice(0, 5).map((product, index) => (
+                  {products.slice(0, 5).map((product, index) => (
                     <div key={product.id} className="flex items-center p-4 hover:bg-gray-50">
                       <span className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium mr-4">{index + 1}</span>
                       <div className="flex-1">
@@ -380,6 +429,12 @@ export default function AdminPage() {
                       <p className="font-medium">₹{product.price?.toLocaleString() || '0'}</p>
                     </div>
                   ))}
+                  {products.length === 0 && (
+                    <div className="p-6 text-center text-gray-500">
+                      <FiBox className="mx-auto mb-2" size={32} />
+                      <p>No products yet</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             </div>
@@ -403,64 +458,63 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full mx-auto mb-4" />
-                <p className="text-gray-500">Loading products...</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredProducts.map((product) => (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 relative">
+                            {product.images?.[0] && (
+                              <Image src={product.images[0]} alt={product.name || ''} fill className="object-cover" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-xs text-gray-500">{product.slug}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm">{typeof product.category === 'string' ? product.category : 'Uncategorized'}</td>
+                      <td className="px-6 py-4 text-sm font-medium">₹{product.price?.toLocaleString() || '0'}</td>
+                      <td className="px-6 py-4 text-sm">{product.stock || 0}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${(product.stock || 0) > 10 ? 'bg-green-100 text-green-800' : (product.stock || 0) > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                          {(product.stock || 0) > 10 ? 'In Stock' : (product.stock || 0) > 0 ? 'Low Stock' : 'Out of Stock'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => { setProductForm({ ...product, price: product.price?.toString() || '', original_price: product.original_price?.toString() || '', category: typeof product.category === 'string' ? product.category : '', stock: product.stock?.toString() || '' } as any); setShowAddProduct(true); }} className="p-2 hover:bg-gray-100 rounded-lg">
+                            <FiEdit size={16} />
+                          </button>
+                          <button onClick={() => handleDeleteProduct(product.id)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg">
+                            <FiTrash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredProducts.map((product) => (
-                      <tr key={product.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 relative">
-                              {product.images?.[0] && (
-                                <Image src={product.images[0]} alt={product.name || ''} fill className="object-cover" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-xs text-gray-500">{product.slug}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm">{typeof product.category === 'string' ? product.category : 'Uncategorized'}</td>
-                        <td className="px-6 py-4 text-sm font-medium">₹{product.price?.toLocaleString() || '0'}</td>
-                        <td className="px-6 py-4 text-sm">{product.stock || 0}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-3 py-1 text-xs font-medium rounded-full ${(product.stock || 0) > 10 ? 'bg-green-100 text-green-800' : (product.stock || 0) > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                            {(product.stock || 0) > 10 ? 'In Stock' : (product.stock || 0) > 0 ? 'Low Stock' : 'Out of Stock'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => { setProductForm({ ...product, price: product.price?.toString() || '', original_price: product.original_price?.toString() || '', category: typeof product.category === 'string' ? product.category : '', stock: product.stock?.toString() || '' } as any); setShowAddProduct(true); }} className="p-2 hover:bg-gray-100 rounded-lg">
-                              <FiEdit size={16} />
-                            </button>
-                            <button onClick={() => handleDeleteProduct(product.id)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg">
-                              <FiTrash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  ))}
+                </tbody>
+              </table>
+              {products.length === 0 && (
+                <div className="p-12 text-center text-gray-500">
+                  <FiBox className="mx-auto mb-4" size={48} />
+                  <p>No products found. Add your first product to get started.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -475,58 +529,48 @@ export default function AdminPage() {
                   )}
                 </div>
                 <div className="p-4">
-                  <h3 className="font-bold">{category.name}</h3>
-                  <p className="text-sm text-gray-500">{category.description}</p>
+                  <div className="flex items-start justify-between">
+                    <h3 className="font-bold">{category.name}</h3>
+                    <span className={`text-xs px-2 py-1 rounded-full ${category.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {category.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{category.description}</p>
                   <p className="text-xs text-gray-400 mt-2">{category.slug}</p>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => handleEditCategory(category)}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <FiEdit size={16} />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(category.id)}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-sm font-medium text-red-600 transition-colors"
+                    >
+                      <FiTrash2 size={16} />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             ))}
+            {categories.length === 0 && (
+              <div className="col-span-full p-12 text-center text-gray-500 bg-white rounded-xl">
+                <FiGrid className="mx-auto mb-4" size={48} />
+                <p>No categories found. Add your first category to get started.</p>
+              </div>
+            )}
           </div>
         )}
 
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center gap-4">
-                <input type="text" placeholder="Search orders..." className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {[
-                    { id: 'ORD-001', customer: 'John Doe', items: 2, total: 1899, status: 'delivered', date: '2024-01-15' },
-                    { id: 'ORD-002', customer: 'Sarah Smith', items: 1, total: 2499, status: 'shipped', date: '2024-01-15' },
-                    { id: 'ORD-003', customer: 'Mike Johnson', items: 3, total: 3299, status: 'processing', date: '2024-01-14' },
-                    { id: 'ORD-004', customer: 'Emily Davis', items: 1, total: 899, status: 'pending', date: '2024-01-14' },
-                    { id: 'ORD-005', customer: 'Chris Wilson', items: 2, total: 1599, status: 'cancelled', date: '2024-01-13' },
-                  ].map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium">{order.id}</td>
-                      <td className="px-6 py-4 text-sm">{order.customer}</td>
-                      <td className="px-6 py-4 text-sm">{order.items}</td>
-                      <td className="px-6 py-4 text-sm font-medium">₹{order.total.toLocaleString()}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusColors[order.status].bg} ${statusColors[order.status].text}`}>
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{order.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-6 text-center text-gray-500">
+              <FiShoppingCart className="mx-auto mb-4" size={48} />
+              <p>Orders management coming soon</p>
             </div>
           </div>
         )}
@@ -534,138 +578,179 @@ export default function AdminPage() {
         {/* Customers Tab */}
         {activeTab === 'customers' && (
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orders</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Spent</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {[
-                    { name: 'John Doe', email: 'john@example.com', orders: 12, total: 45000, joined: '2024-01-15' },
-                    { name: 'Sarah Smith', email: 'sarah@example.com', orders: 8, total: 32000, joined: '2024-02-01' },
-                    { name: 'Mike Johnson', email: 'mike@example.com', orders: 5, total: 18000, joined: '2024-02-10' },
-                  ].map((customer, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium">{customer.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{customer.email}</td>
-                      <td className="px-6 py-4 text-sm">{customer.orders}</td>
-                      <td className="px-6 py-4 text-sm font-medium">₹{customer.total.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{customer.joined}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-6 text-center text-gray-500">
+              <FiUsers className="mx-auto mb-4" size={48} />
+              <p>Customers management coming soon</p>
             </div>
           </div>
         )}
 
-        {(activeTab === 'analytics' || activeTab === 'settings') && (
-          <div className="bg-white rounded-xl p-8 text-center">
-            <p className="text-gray-500">This section is under development</p>
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6 text-center text-gray-500">
+              <FiBarChart2 className="mx-auto mb-4" size={48} />
+              <p>Analytics dashboard coming soon</p>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6 text-center text-gray-500">
+              <FiSettings className="mx-auto mb-4" size={48} />
+              <p>Settings page coming soon</p>
+            </div>
           </div>
         )}
       </main>
 
       {/* Add Product Modal */}
       {showAddProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Add New Product</h2>
-              <button onClick={() => setShowAddProduct(false)} className="p-2 hover:bg-gray-100 rounded-lg"><FiX size={20} /></button>
+              <button onClick={() => setShowAddProduct(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <FiX size={20} />
+              </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Product Name *</label>
-                <input type="text" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="Enter product name" />
+                <input
+                  type="text"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  placeholder="Product name"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>
-                <textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" rows={3} placeholder="Enter product description" />
+                <textarea
+                  value={productForm.description}
+                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  placeholder="Product description"
+                  rows={3}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Price *</label>
-                  <input type="number" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="0" />
+                  <input
+                    type="number"
+                    value={productForm.price}
+                    onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                    placeholder="0.00"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Original Price</label>
-                  <input type="number" value={productForm.original_price} onChange={(e) => setProductForm({ ...productForm, original_price: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="0" />
+                  <input
+                    type="number"
+                    value={productForm.original_price}
+                    onChange={(e) => setProductForm({ ...productForm, original_price: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Category *</label>
-                  <select value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black">
-                    <option value="">Select category</option>
-                    {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                  <select
+                    value={productForm.category}
+                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.filter(c => c.is_active).map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Stock</label>
-                  <input type="number" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="0" />
+                  <input
+                    type="number"
+                    value={productForm.stock}
+                    onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                    placeholder="0"
+                  />
                 </div>
               </div>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={productForm.is_featured} onChange={(e) => setProductForm({ ...productForm, is_featured: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">Featured</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={productForm.is_new} onChange={(e) => setProductForm({ ...productForm, is_new: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">New Arrival</span>
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Product Image URL</label>
-                <input type="url" value={productForm.images[0]} onChange={(e) => setProductForm({ ...productForm, images: [e.target.value] })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="https://example.com/image.jpg" />
-              </div>
             </div>
-            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-4">
-              <Button variant="outline" onClick={() => setShowAddProduct(false)}>Cancel</Button>
-              <Button onClick={handleSaveProduct}><FiPlus className="mr-2" />Add Product</Button>
+            <div className="flex gap-4 mt-6">
+              <Button variant="outline" onClick={() => setShowAddProduct(false)} className="flex-1">Cancel</Button>
+              <Button onClick={handleSaveProduct} className="flex-1">Add Product</Button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
       {/* Add Category Modal */}
       {showAddCategory && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-xl font-bold">Add New Category</h2>
-              <button onClick={() => setShowAddCategory(false)} className="p-2 hover:bg-gray-100 rounded-lg"><FiX size={20} /></button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">{editingCategory ? 'Edit Category' : 'Add New Category'}</h2>
+              <button onClick={() => { setShowAddCategory(false); setEditingCategory(null); }} className="p-2 hover:bg-gray-100 rounded-lg">
+                <FiX size={20} />
+              </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Category Name *</label>
-                <input type="text" value={categoryForm.name} onChange={(e) => { setCategoryForm({ ...categoryForm, name: e.target.value, slug: generateSlug(e.target.value) }); }} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="Enter category name" />
+                <input
+                  type="text"
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value, slug: editingCategory ? categoryForm.slug : generateSlug(e.target.value) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  placeholder="Category name"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Slug *</label>
-                <input type="text" value={categoryForm.slug} onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="category-slug" />
+                <input
+                  type="text"
+                  value={categoryForm.slug}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  placeholder="category-slug"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <textarea value={categoryForm.description} onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" rows={2} placeholder="Enter description" />
+                <label className="block text-sm font-medium mb-1">Sort Order</label>
+                <input
+                  type="number"
+                  value={categoryForm.sort_order || 0}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, sort_order: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                  placeholder="0"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Category Image URL</label>
-                <input type="url" value={categoryForm.image_url} onChange={(e) => setCategoryForm({ ...categoryForm, image_url: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black" placeholder="https://example.com/image.jpg" />
+                <label className="block text-sm font-medium mb-1">Status</label>
+                <select
+                  value={categoryForm.is_active ? 'active' : 'inactive'}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, is_active: e.target.value === 'active' })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-4">
-              <Button variant="outline" onClick={() => setShowAddCategory(false)}>Cancel</Button>
-              <Button onClick={handleSaveCategory}><FiPlus className="mr-2" />Add Category</Button>
+            <div className="flex gap-4 mt-6">
+              <Button variant="outline" onClick={() => { setShowAddCategory(false); setEditingCategory(null); }} className="flex-1">Cancel</Button>
+              <Button onClick={handleSaveCategory} className="flex-1">{editingCategory ? 'Update Category' : 'Add Category'}</Button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
     </div>

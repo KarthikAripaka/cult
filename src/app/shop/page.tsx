@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { FiGrid, FiList, FiFilter, FiX, FiChevronDown, FiShoppingBag } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/product/ProductCard';
@@ -42,6 +43,7 @@ const filterOptions = {
 
 function ShopContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { addItem } = useCartStore();
   
   const [products, setProducts] = useState<Product[]>([]);
@@ -52,6 +54,7 @@ function ShopContent() {
   
   // Filters state
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<string>('');
@@ -59,6 +62,11 @@ function ShopContent() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Update searchQuery when URL params change
+  useEffect(() => {
+    setSearchQuery(searchParams.get('q') || '');
+  }, [searchParams]);
   
   // Fetch categories
   useEffect(() => {
@@ -103,6 +111,10 @@ function ShopContent() {
           if (max && max !== '+') params.append('maxPrice', max);
         }
         
+        if (searchQuery) {
+          params.append('q', searchQuery);
+        }
+        
         const response = await fetch(`/api/products?${params.toString()}`);
         const data = await response.json();
         
@@ -118,7 +130,7 @@ function ShopContent() {
     };
     
     fetchProducts();
-  }, [selectedCategory, selectedSizes, selectedColors, priceRange, sortBy, currentPage]);
+  }, [selectedCategory, selectedSizes, selectedColors, priceRange, sortBy, currentPage, searchQuery]);
   
   // Handle size filter
   const toggleSize = (size: string) => {
@@ -144,13 +156,19 @@ function ShopContent() {
     setPriceRange('');
     setCurrentPage(1);
   };
+
+  // Clear search
+  const clearSearch = () => {
+    router.push('/shop');
+  };
   
   // Has active filters
   const hasActiveFilters = selectedCategory !== 'all' || selectedSizes.length > 0 || 
-    selectedColors.length > 0 || priceRange !== '';
+    selectedColors.length > 0 || priceRange !== '' || searchQuery !== '';
   
   // Get page title
   const getPageTitle = () => {
+    if (searchQuery) return `Search: "${searchQuery}"`;
     if (selectedCategory === 'all') return 'Shop All';
     if (selectedCategory === 'new-arrivals') return 'New Arrivals';
     const category = categories.find(c => c.slug === selectedCategory);
@@ -203,45 +221,6 @@ function ShopContent() {
           </motion.div>
         </div>
       </section>
-      
-      {/* Category Images Section */}
-      {selectedCategory === 'all' && (
-        <section className="max-w-7xl mx-auto px-4 py-8">
-          <h2 className="text-2xl font-bold mb-6">Shop by Category</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {categories.map((category) => (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -5 }}
-                className="relative group cursor-pointer rounded-xl overflow-hidden"
-                onClick={() => { setSelectedCategory(category.slug); setCurrentPage(1); }}
-              >
-                <div className="aspect-square relative">
-                  {category.image_url ? (
-                    <Image
-                      src={category.image_url}
-                      alt={category.name}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-110"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                      <span className="text-4xl">👕</span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <h3 className="text-white font-bold text-lg">{category.name}</h3>
-                    <p className="text-white/80 text-xs">{category.description}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-      )}
       
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Toolbar */}
@@ -311,17 +290,39 @@ function ShopContent() {
               
               {/* Clear Filters */}
               {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="text-orange-500 text-sm mb-6 hover:underline"
-                >
-                  Clear All Filters
-                </button>
+                <div className="space-y-2 mb-6">
+                  {searchQuery && (
+                    <button
+                      onClick={clearSearch}
+                      className="text-orange-500 text-sm hover:underline flex items-center gap-2"
+                    >
+                      <FiX size={14} />
+                      Clear search: "{searchQuery}"
+                    </button>
+                  )}
+                  <button
+                    onClick={clearFilters}
+                    className="text-orange-500 text-sm hover:underline"
+                  >
+                    Clear All Filters
+                  </button>
+                </div>
               )}
               
               {/* Category Filter */}
               <div className="mb-8">
-                <h4 className="font-medium mb-4">Category</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">Category</h4>
+                  {selectedCategory !== 'all' && (
+                    <button
+                      onClick={() => { setSelectedCategory('all'); setCurrentPage(1); }}
+                      className="text-xs text-orange-500 hover:underline flex items-center gap-1"
+                    >
+                      <FiX size={12} />
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -360,7 +361,18 @@ function ShopContent() {
               
               {/* Size Filter */}
               <div className="mb-8">
-                <h4 className="font-medium mb-4">Size</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">Size</h4>
+                  {selectedSizes.length > 0 && (
+                    <button
+                      onClick={() => { setSelectedSizes([]); setCurrentPage(1); }}
+                      className="text-xs text-orange-500 hover:underline flex items-center gap-1"
+                    >
+                      <FiX size={12} />
+                      Clear ({selectedSizes.length})
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {filterOptions.sizes.map(size => (
                     <button
@@ -381,7 +393,18 @@ function ShopContent() {
               
               {/* Color Filter */}
               <div className="mb-8">
-                <h4 className="font-medium mb-4">Color</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">Color</h4>
+                  {selectedColors.length > 0 && (
+                    <button
+                      onClick={() => { setSelectedColors([]); setCurrentPage(1); }}
+                      className="text-xs text-orange-500 hover:underline flex items-center gap-1"
+                    >
+                      <FiX size={12} />
+                      Clear ({selectedColors.length})
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {filterOptions.colors.map(color => (
                     <button
@@ -402,7 +425,18 @@ function ShopContent() {
               
               {/* Price Filter */}
               <div className="mb-8">
-                <h4 className="font-medium mb-4">Price Range</h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">Price Range</h4>
+                  {priceRange && (
+                    <button
+                      onClick={() => { setPriceRange(''); setCurrentPage(1); }}
+                      className="text-xs text-orange-500 hover:underline flex items-center gap-1"
+                    >
+                      <FiX size={12} />
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {filterOptions.priceRanges.map(range => (
                     <label key={range.value} className="flex items-center gap-2 cursor-pointer">

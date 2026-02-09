@@ -4,80 +4,11 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { FiPackage, FiTruck, FiCheck, FiX, FiClock, FiArrowRight } from 'react-icons/fi';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { FiPackage, FiTruck, FiCheck, FiX, FiClock, FiArrowRight, FiShoppingBag, FiAlertCircle } from 'react-icons/fi';
 import Button from '@/components/ui/Button';
+import { useAuthStore } from '@/store';
 import { Order } from '@/types';
-import toast from 'react-hot-toast';
-
-// Demo orders for when database is unavailable
-const demoOrders: Order[] = [
-  {
-    id: 'ORD-2024-001',
-    user_id: 'demo-user',
-    items: [
-      { product: { id: '1', name: 'Premium Cotton T-Shirt', images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200'] }, quantity: 2, price: 49.99, size: 'M', color: 'White' },
-      { product: { id: '2', name: 'Classic Denim Jeans', images: ['https://images.unsplash.com/photo-1542272604-787c3835535d?w=200'] }, quantity: 1, price: 89.99, size: '32', color: 'Blue' },
-    ],
-    subtotal: 189.97,
-    shipping: 150,
-    tax: 34.20,
-    total: 374.17,
-    status: 'delivered',
-    payment_status: 'paid',
-    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-    shipping_address: {
-      name: 'John Doe',
-      address_line1: '123 Main Street',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      pincode: '400001',
-    },
-  },
-  {
-    id: 'ORD-2024-002',
-    user_id: 'demo-user',
-    items: [
-      { product: { id: '3', name: 'Urban Jacket', images: ['https://images.unsplash.com/photo-1551028719-00167b16eac5?w=200'] }, quantity: 1, price: 149.99, size: 'L', color: 'Black' },
-    ],
-    subtotal: 149.99,
-    shipping: 0,
-    tax: 27.00,
-    total: 176.99,
-    status: 'shipped',
-    payment_status: 'paid',
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    shipping_address: {
-      name: 'John Doe',
-      address_line1: '123 Main Street',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      pincode: '400001',
-    },
-  },
-  {
-    id: 'ORD-2024-003',
-    user_id: 'demo-user',
-    items: [
-      { product: { id: '4', name: 'Oversized Hoodie', images: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200'] }, quantity: 1, price: 69.99, size: 'XL', color: 'Gray' },
-      { product: { id: '5', name: 'Track Pants', images: ['https://images.unsplash.com/photo-1483721310020-03333e577078?w=200'] }, quantity: 2, price: 49.99, size: 'L', color: 'Black' },
-    ],
-    subtotal: 169.97,
-    shipping: 0,
-    tax: 30.60,
-    total: 200.57,
-    status: 'processing',
-    payment_status: 'paid',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    shipping_address: {
-      name: 'John Doe',
-      address_line1: '123 Main Street',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      pincode: '400001',
-    },
-  },
-];
 
 const statusConfig = {
   pending: { icon: FiClock, color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Pending' },
@@ -89,24 +20,70 @@ const statusConfig = {
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('id');
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const orderIdParam = searchParams.get('id');
+  const orderNumberParam = searchParams.get('orderNumber');
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Fetch orders from API
   useEffect(() => {
-    // Load orders - in production, fetch from API
-    setOrders(demoOrders);
-    setLoading(false);
-  }, []);
+    const fetchOrders = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
 
+      try {
+        const response = await fetch(`/api/orders?userId=${user.id}`);
+        const data = await response.json();
+        
+        if (data.error) {
+          setError(data.error);
+        } else if (data.orders) {
+          setOrders(data.orders);
+        }
+      } catch (err) {
+        setError('Failed to fetch orders. Please try again.');
+        console.error('Error fetching orders:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [user]);
+
+  // Fetch single order if ID or orderNumber provided
   useEffect(() => {
-    if (orderId && orders.length > 0) {
-      const order = orders.find((o: Order) => o.id === orderId);
-      if (order) setSelectedOrder(order);
-    }
-  }, [orderId, orders]);
+    const fetchSingleOrder = async () => {
+      const orderId = orderIdParam || orderNumberParam;
+      if (!orderId || !user?.id) return;
+      
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/orders?userId=${user.id}&${orderNumberParam ? 'orderNumber' : 'id'}=${orderId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+          setError(data.error);
+        } else if (data.order) {
+          setSelectedOrder(data.order);
+        }
+      } catch (err) {
+        setError('Failed to fetch order details.');
+        console.error('Error fetching order:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSingleOrder();
+  }, [orderIdParam, orderNumberParam, user]);
 
   if (loading) {
     return (
@@ -116,6 +93,23 @@ export default function OrdersPage() {
     );
   }
 
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-24">
+        <div className="max-w-6xl mx-auto px-4 py-12">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+            <FiAlertCircle className="mx-auto text-red-500 mb-4" size={48} />
+            <h2 className="text-xl font-bold text-red-800 mb-2">Error Loading Orders</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show order details
   if (selectedOrder) {
     const status = statusConfig[selectedOrder.status as keyof typeof statusConfig];
     const StatusIcon = status?.icon || FiPackage;
@@ -124,7 +118,10 @@ export default function OrdersPage() {
       <div className="min-h-screen bg-gray-50 pt-24">
         <div className="max-w-4xl mx-auto px-4 py-12">
           <button
-            onClick={() => setSelectedOrder(null)}
+            onClick={() => {
+              setSelectedOrder(null);
+              router.push('/orders');
+            }}
             className="flex items-center gap-2 text-gray-600 hover:text-black mb-6"
           >
             <FiArrowRight className="rotate-180" />
@@ -135,7 +132,7 @@ export default function OrdersPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-gray-500">Order ID</p>
-                <h1 className="text-2xl font-bold">{selectedOrder.id}</h1>
+                <h1 className="text-2xl font-bold">{selectedOrder.order_number || selectedOrder.id}</h1>
                 <p className="text-sm text-gray-500 mt-1">
                   Placed on {new Date(selectedOrder.created_at).toLocaleDateString('en-IN', {
                     year: 'numeric', month: 'long', day: 'numeric'
@@ -149,30 +146,35 @@ export default function OrdersPage() {
             </div>
           </div>
 
+          {/* Order Items */}
           <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
             <h2 className="text-lg font-bold mb-4">Order Items</h2>
             <div className="space-y-4">
-              {selectedOrder.items.map((item: any, index: number) => (
-                <div key={index} className="flex items-center gap-4">
-                  <div className="w-20 h-24 relative rounded-lg overflow-hidden bg-gray-100">
-                    {item.product?.images?.[0] && (
-                      <Image
-                        src={item.product.images[0]}
-                        alt={item.product.name || 'Product'}
-                        fill
-                        className="object-cover"
-                      />
-                    )}
+              {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                selectedOrder.items.map((item: any, index: number) => (
+                  <div key={index} className="flex items-center gap-4">
+                    <div className="w-20 h-24 relative rounded-lg overflow-hidden bg-gray-100">
+                      {item.image && (
+                        <Image
+                          src={item.image}
+                          alt={item.name || 'Product'}
+                          fill
+                          className="object-cover"
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium">{item.name || 'Product'}</h3>
+                      <p className="text-sm text-gray-500">Qty: {item.quantity} × ₹{item.price}</p>
+                      {item.size && <p className="text-xs text-gray-400">Size: {item.size}</p>}
+                      {item.color && <p className="text-xs text-gray-400">Color: {item.color}</p>}
+                    </div>
+                    <p className="font-medium">₹{(item.quantity * item.price).toFixed(2)}</p>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium">{item.product?.name || 'Product'}</h3>
-                    <p className="text-sm text-gray-500">Qty: {item.quantity} × ₹{item.price}</p>
-                    {item.size && <p className="text-xs text-gray-400">Size: {item.size}</p>}
-                    {item.color && <p className="text-xs text-gray-400">Color: {item.color}</p>}
-                  </div>
-                  <p className="font-medium">₹{(item.quantity * item.price).toFixed(2)}</p>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-gray-500">Order details not available</p>
+              )}
             </div>
           </div>
 
@@ -182,31 +184,25 @@ export default function OrdersPage() {
               <div className="space-y-2">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>₹{selectedOrder.subtotal?.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Shipping</span>
-                  <span>{selectedOrder.shipping === 0 ? 'Free' : `₹${selectedOrder.shipping}`}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tax</span>
-                  <span>₹{selectedOrder.tax?.toFixed(2)}</span>
+                  <span>₹{selectedOrder.subtotal?.toFixed(2) || '0.00'}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
                   <span>Total</span>
-                  <span>₹{selectedOrder.total?.toFixed(2)}</span>
+                  <span>₹{selectedOrder.total?.toFixed(2) || '0.00'}</span>
                 </div>
               </div>
             </div>
 
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h2 className="text-lg font-bold mb-4">Shipping Address</h2>
-              {selectedOrder.shipping_address && (
+              {selectedOrder.shipping_address ? (
                 <div className="text-gray-600">
-                  <p className="font-medium">{selectedOrder.shipping_address.name}</p>
-                  <p>{selectedOrder.shipping_address.address_line1}</p>
-                  <p>{selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state} {selectedOrder.shipping_address.pincode}</p>
+                  <p className="font-medium">{(selectedOrder.shipping_address as any).name}</p>
+                  <p>{(selectedOrder.shipping_address as any).address_line1}</p>
+                  <p>{(selectedOrder.shipping_address as any).city}, {(selectedOrder.shipping_address as any).state} {(selectedOrder.shipping_address as any).pincode}</p>
                 </div>
+              ) : (
+                <p className="text-gray-500">Address not available</p>
               )}
             </div>
           </div>
@@ -215,6 +211,7 @@ export default function OrdersPage() {
     );
   }
 
+  // Show orders list
   return (
     <div className="min-h-screen bg-gray-50 pt-24">
       <div className="max-w-6xl mx-auto px-4 py-12">
@@ -225,12 +222,23 @@ export default function OrdersPage() {
           <h1 className="text-3xl font-bold mb-2">My Orders</h1>
           <p className="text-gray-500 mb-8">Track and manage your orders</p>
 
-          {orders.length === 0 ? (
+          {!user ? (
+            <div className="text-center py-12 bg-white rounded-xl">
+              <FiPackage size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-500 mb-4">Please login to view your orders</p>
+              <Link href="/auth/login">
+                <Button>Login to View Orders</Button>
+              </Link>
+            </div>
+          ) : orders.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl">
               <FiPackage size={48} className="mx-auto text-gray-300 mb-4" />
               <p className="text-gray-500 mb-4">No orders yet</p>
               <Link href="/shop">
-                <Button>Start Shopping</Button>
+                <Button>
+                  <FiShoppingBag className="mr-2" />
+                  Start Shopping
+                </Button>
               </Link>
             </div>
           ) : (
@@ -244,24 +252,18 @@ export default function OrdersPage() {
                     key={order.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+                    className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setSelectedOrder(order)}
                   >
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 relative">
-                          {order.items[0]?.product?.images?.[0] && (
-                            <Image
-                              src={order.items[0].product.images[0]}
-                              alt={order.items[0].product.name || 'Product'}
-                              fill
-                              className="object-cover"
-                            />
-                          )}
+                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+                          <FiPackage size={24} className="text-gray-400" />
                         </div>
                         <div>
-                          <p className="font-medium">{order.id}</p>
+                          <p className="font-medium">{order.order_number || order.id}</p>
                           <p className="text-sm text-gray-500">
-                            {order.items.length} item{order.items.length > 1 ? 's' : ''} • ₹{order.total?.toFixed(2)}
+                            {order.items?.length || 0} items • ₹{order.total?.toFixed(2) || '0.00'}
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
                             {new Date(order.created_at).toLocaleDateString('en-IN', {
@@ -276,9 +278,9 @@ export default function OrdersPage() {
                           <StatusIcon size={14} />
                           <span className="text-sm font-medium">{status?.label || order.status}</span>
                         </div>
-                        <Link href={`/orders?id=${order.id}`}>
-                          <Button variant="outline" size="sm">View Details</Button>
-                        </Link>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
