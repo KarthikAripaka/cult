@@ -1,37 +1,45 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { categories } from '@/data/products';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// Check if Supabase is configured
-function isSupabaseConfigured(): boolean {
-  return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && 
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://your-project.supabase.co' &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== 'your-anon-key'
-  );
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-export async function GET() {
-  // Use demo categories if Supabase is not configured
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ categories });
-  }
-  
-  // Use Supabase database
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// GET all categories
+export async function GET(request: NextRequest) {
   try {
-    const { data: categoriesData, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const includeInactive = searchParams.get('includeInactive') === 'true';
+
+    // Use query with explicit column selection
+    let supabaseQuery = supabaseAdmin
       .from('categories')
-      .select('*')
-      .eq('is_active', true)
+      .select('id, name, slug, description, image_url, parent_id, is_active, sort_order, created_at')
       .order('sort_order', { ascending: true });
 
-    if (error) throw error;
+    if (!includeInactive) {
+      supabaseQuery = supabaseQuery.eq('is_active', true);
+    }
 
-    return NextResponse.json({ categories: categoriesData || [] });
+    const { data: categories, error } = await supabaseQuery;
+
+    if (error) {
+      console.error('Categories fetch error:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch categories: ' + error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      categories: categories || [],
+    });
   } catch (error) {
-    console.error('Categories fetch error:', error);
-    // Fallback to demo categories on error
-    return NextResponse.json({ categories });
+    console.error('Categories API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
