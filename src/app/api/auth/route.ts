@@ -20,14 +20,14 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseClient();
 
     if (!supabase || !userId) {
-      return NextResponse.json({
-        user: null,
-        demoMode: true,
-      });
+      return NextResponse.json(
+        { error: 'User ID required' },
+        { status: 400 }
+      );
     }
 
     const { data: user, error } = await supabase
-      .from('users')
+      .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
@@ -59,15 +59,14 @@ export async function PATCH(request: NextRequest) {
     const supabase = getSupabaseClient();
 
     if (!supabase || !userId) {
-      return NextResponse.json({
-        success: true,
-        demoMode: true,
-        message: 'Profile updated in demo mode',
-      });
+      return NextResponse.json(
+        { error: 'User ID required' },
+        { status: 400 }
+      );
     }
 
     const { data: user, error } = await supabase
-      .from('users')
+      .from('profiles')
       .update({
         name,
         phone,

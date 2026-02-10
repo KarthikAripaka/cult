@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FcGoogle } from 'react-icons/fc';
 import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
 import { useAuthStore } from '@/store';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
@@ -15,90 +14,21 @@ export default function LoginPage() {
   const router = useRouter();
   const { setUser, setLoading: setStoreLoading } = useAuthStore();
   
-  const [loading, setLocalLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Email/Password Login
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!email || !password) {
-      toast.error('Please enter email and password');
-      return;
-    }
-
-    setLocalLoading(true);
-    setStoreLoading(true);
-    
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast.error(error.message);
-        setStoreLoading(false);
-        setLocalLoading(false);
-        return;
-      }
-
-      if (data.user) {
-        // Fetch user profile from users table
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profile) {
-          setUser(profile);
-        } else {
-          // Create profile if doesn't exist
-          const { data: newProfile } = await supabase
-            .from('users')
-            .insert({
-              id: data.user.id,
-              email: data.user.email,
-              name: data.user.user_metadata?.name || email.split('@')[0],
-              is_admin: false,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-          
-          if (newProfile) {
-            setUser(newProfile);
-          }
-        }
-        
-        toast.success('Welcome back!');
-        router.push('/');
-      }
-    } catch (error) {
-      toast.error('An error occurred. Please try again.');
-      setStoreLoading(false);
-      setLocalLoading(false);
-    }
-  };
-
-  // Google Sign In
+  // Google Sign In - shows email suggestions to prevent fake emails
   const handleGoogleSignIn = async () => {
-    setLocalLoading(true);
+    setLoading(true);
     setStoreLoading(true);
     
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: 'https://qhmfvgqzcspufsvjrrvb.supabase.co/auth/v1/callback',
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'consent', // Forces email selection from Google account
           },
         },
       });
@@ -106,38 +36,14 @@ export default function LoginPage() {
       if (error) {
         toast.error(error.message);
         setStoreLoading(false);
-        setLocalLoading(false);
+        setLoading(false);
       }
       // Redirect will happen automatically by Supabase
     } catch (error) {
       toast.error('An error occurred with Google sign in');
       setStoreLoading(false);
-      setLocalLoading(false);
+      setLoading(false);
     }
-  };
-
-  // Demo login
-  const handleDemoLogin = () => {
-    setLocalLoading(true);
-    setStoreLoading(true);
-    
-    setTimeout(() => {
-      setUser({
-        id: 'demo-user',
-        email: 'demo@cult.com',
-        name: 'Demo User',
-        avatar_url: undefined,
-        phone: undefined,
-        is_admin: false,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-      toast.success('Welcome to Demo Mode!');
-      setLocalLoading(false);
-      setStoreLoading(false);
-      router.push('/');
-    }, 500);
   };
 
   return (
@@ -162,80 +68,23 @@ export default function LoginPage() {
             <p className="text-gray-600">Sign in to your account</p>
           </div>
 
-          {/* Email/Password Form */}
-          <form onSubmit={handleEmailLogin} className="space-y-4 mb-6">
-            <Input
-              type="email"
-              label="Email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <div className="relative">
-              <Input
-                type={showPassword ? 'text' : 'password'}
-                label="Password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-[38px] text-gray-500 hover:text-black text-sm"
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-            
-            <Button
-              type="submit"
-              className="w-full"
-              isLoading={loading}
-            >
-              Sign In
-            </Button>
-          </form>
-
-          {/* Forgot Password Link */}
-          <div className="text-right mb-4">
-            <Link href="/auth/forgot-password" className="text-sm text-orange-500 hover:underline">
-              Forgot Password?
-            </Link>
-          </div>
-
-          {/* Divider */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 border-t border-gray-200" />
-            <span className="text-sm text-gray-500">or</span>
-            <div className="flex-1 border-t border-gray-200" />
-          </div>
-
-          {/* Demo Login Button */}
+          {/* Google Sign In - Shows email picker from Google */}
           <Button
             variant="outline"
-            className="w-full mb-4"
-            onClick={handleDemoLogin}
-            disabled={loading}
-          >
-            Continue as Demo User
-          </Button>
-
-          {/* Google Sign In */}
-          <Button
-            variant="outline"
-            className="w-full flex items-center justify-center gap-3"
+            className="w-full flex items-center justify-center gap-3 py-4"
             onClick={handleGoogleSignIn}
-            disabled={loading}
+            isLoading={loading}
           >
-            <FcGoogle size={22} />
+            <FcGoogle size={24} />
             Continue with Google
           </Button>
 
+          <p className="text-xs text-gray-500 text-center mt-4">
+            We'll show your Google accounts to choose from
+          </p>
+
           {/* Register Link */}
-          <p className="text-center text-gray-600 mt-6">
+          <p className="text-center text-gray-600 mt-8">
             Don't have an account?{' '}
             <Link href="/auth/signup" className="text-orange-500 hover:underline font-medium">
               Sign up
