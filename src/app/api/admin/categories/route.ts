@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('categories')
-      .select('*')
+      .select('id, name, slug, description, image_url, sort_order, is_active, created_at')
       .order('sort_order', { ascending: true });
 
     if (!includeInactive) {
@@ -63,39 +63,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const categoryId = uuidv4();
+    
     // Check if slug already exists
-    const { data: existingCategory } = await supabaseAdmin
+    const { data: checkData } = await supabaseAdmin
       .from('categories')
       .select('id')
       .eq('slug', slug)
-      .single();
-
-    if (existingCategory) {
+      .limit(1);
+    
+    if (checkData && checkData.length > 0) {
       return NextResponse.json(
         { error: 'Category with this slug already exists' },
         { status: 400 }
       );
     }
 
+    // Insert using Supabase client
     const { data: category, error } = await supabaseAdmin
       .from('categories')
       .insert({
-        id: uuidv4(),
+        id: categoryId,
         name,
         slug,
-        description,
-        image_url,
+        description: description || null,
+        image_url: image_url || null,
         sort_order: sort_order || 0,
         is_active: true,
-        created_at: new Date().toISOString(),
       })
-      .select()
+      .select('id, name, slug, description, image_url, sort_order, is_active, created_at')
       .single();
 
     if (error) {
       console.error('Category creation error:', error);
       return NextResponse.json(
-        { error: 'Failed to create category' },
+        { error: 'Failed to create category: ' + error.message },
         { status: 500 }
       );
     }
@@ -140,23 +142,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Check slug uniqueness if being updated
-    if (updateData.slug) {
-      const { data: slugExists } = await supabaseAdmin
-        .from('categories')
-        .select('id')
-        .eq('slug', updateData.slug)
-        .neq('id', categoryId)
-        .single();
-
-      if (slugExists) {
-        return NextResponse.json(
-          { error: 'Category with this slug already exists' },
-          { status: 400 }
-        );
-      }
-    }
-
+    // Update
     const { data: category, error } = await supabaseAdmin
       .from('categories')
       .update({
@@ -164,7 +150,7 @@ export async function PATCH(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', categoryId)
-      .select()
+      .select('id, name, slug, description, image_url, sort_order, is_active, created_at')
       .single();
 
     if (error) {
