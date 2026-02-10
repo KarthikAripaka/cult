@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
   const isFeatured = searchParams.get('is_featured');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '12');
+  const includeInactive = searchParams.get('includeInactive') === 'true';
   
   // Use demo data if Supabase is not configured
   if (!isSupabaseConfigured()) {
@@ -122,11 +123,16 @@ export async function GET(request: NextRequest) {
   // Return categories
   if (type === 'categories') {
     try {
-      const { data: categoriesData, error } = await supabase
+      let query = supabase
         .from('categories')
         .select('*')
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
+      
+      if (!includeInactive) {
+        query = query.eq('is_active', true);
+      }
+      
+      const { data: categoriesData, error } = await query;
       
       if (error) throw error;
       return NextResponse.json({ categories: categoriesData || [] });
@@ -180,9 +186,12 @@ export async function GET(request: NextRequest) {
   try {
     let query = supabase
       .from('products')
-      .select('*, categories(id, name, slug)', { count: 'exact' })
-      .eq('is_active', true);
+      .select('*, categories(id, name, slug)', { count: 'exact' });
       
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
+    }
+    
     if (isFeatured === 'true') {
       query = query.eq('is_featured', true);
     }
@@ -220,7 +229,7 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error;
     
-    // For each product, fetch variants to get sizes/colors
+    // For each product, fetch variants to get sizes/colors and format category
     const productsWithVariants = await Promise.all(
       (products || []).map(async (product) => {
         const { data: variants } = await supabase
@@ -232,7 +241,16 @@ export async function GET(request: NextRequest) {
         const sizes = Array.from(new Set(variants?.map(v => v.size).filter(Boolean)));
         const colors = Array.from(new Set(variants?.map(v => v.color).filter(Boolean)));
         
-        return { ...product, sizes, colors };
+        // Format category as a string for easy display
+        const categoryName = product.categories?.name || 'Uncategorized';
+        
+        return { 
+          ...product, 
+          sizes, 
+          colors,
+          category: categoryName,
+          category_id: product.category_id
+        };
       })
     );
     

@@ -142,8 +142,8 @@ export default function AdminPage() {
         setStats(prev => ({ ...prev, totalProducts: productsData.products.length }));
       }
 
-      // Fetch categories
-      const categoriesResponse = await fetch('/api/categories');
+      // Fetch categories (including inactive for admin)
+      const categoriesResponse = await fetch('/api/categories?includeInactive=true');
       const categoriesData = await categoriesResponse.json();
       
       if (categoriesData.categories) {
@@ -681,7 +681,7 @@ export default function AdminPage() {
                       <span className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium mr-4">{index + 1}</span>
                       <div className="flex-1">
                         <p className="font-medium text-sm">{product.name}</p>
-                        <p className="text-xs text-gray-500">{typeof product.category === 'string' ? product.category : 'Uncategorized'}</p>
+                        <p className="text-xs text-gray-500">{String(product.category || 'Uncategorized')}</p>
                       </div>
                       <p className="font-medium">₹{product.price?.toLocaleString() || '0'}</p>
                     </div>
@@ -743,7 +743,7 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm">{typeof product.category === 'string' ? product.category : 'Uncategorized'}</td>
+                      <td className="px-6 py-4 text-sm">{String(product.category || 'Uncategorized')}</td>
                       <td className="px-6 py-4">
                         {editingField?.productId === product.id && editingField?.field === 'price' ? (
                           <div className="flex items-center gap-2">
@@ -1014,7 +1014,7 @@ export default function AdminPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-black"
                   >
                     <option value="">Select Category</option>
-                    {categories.filter(c => c.is_active).map(category => (
+                    {categories.map(category => (
                       <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
                   </select>
